@@ -1,0 +1,4 @@
+#!/bin/bash
+
+depfile=$1
+echo "hello dependencies got $depfile"
