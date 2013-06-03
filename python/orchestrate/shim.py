@@ -7,36 +7,22 @@ Shim objects encapsulate what is needed to build a package.
 
 import os
 
-class ShimScript(object):
-    def __init__(self, script, dep_setup, **vars):
-        self.script = script
-        self.vars = vars
-        self.dep_setup = dep_setup
-        return
-
-        
-
-    def __call__(self):
-        from subprocess import Popen, PIPE, STDOUT
-        print 'Executing %s' % self.script
-        proc = Popen(self.script, stdout=PIPE, stderr=STDOUT, 
-                     universal_newlines=True, env=self.env)
-        out, err = proc.communicate()
-        print out
-        assert proc.returncode == 0, 'Shim returned err %d (%s)' % (proc.returncode, self.script)
-        return
-
-    def __str__(self):
-        return '<ShimScript %s>' % self.script
-
-
 class ShimPackage(object):
     '''
     A shim package.
     '''
 
+    shell = '/bin/bash'
     steps = ['version', 'environment', 'dependencies', 'download',
              'unpack', 'prepare', 'build', 'install', 'validate']
+
+    rundirs = {
+        'unpack':        'source_dir',
+        'prepare':       'build_dir',
+        'build':         'build_dir',
+        'install':       'build_dir',
+        'validate':      'install_dir',
+    }
 
     required = ['package_name', 'package_version', 'package_url',
                 'source_dir', 'unpacked_dir', 'build_dir', 'install_dir',
@@ -50,6 +36,7 @@ class ShimPackage(object):
         self.orch_dir = vars.get('orch_dir', 
                                  os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
         self.vars = vars
+
         self.dep_setup = []
         self.runners = {}       # step->script to run
         return
@@ -86,6 +73,13 @@ class ShimPackage(object):
         self.write_orch_environment(fn)
         return fn
 
+    def get_rundir(self, step):
+        '''
+        Return the directory from which to run the shim
+        '''
+        rundir = self.rundirs.get(step, 'build_dir')
+        return self.vars[rundir]
+
     def get_runner(self, step):
         '''
         Return the runner script for given step.
@@ -96,14 +90,15 @@ class ShimPackage(object):
         args = []
         if step == 'environment':
             args = [self.generate_runner_filename('env')]
-        if step == 'dependency':
+        if step == 'dependencies':
             args = [self.generate_runner_filename('dep')]
 
         for maybe in [self.vars['shim_dir'], self.orch_dir]:
             script = os.path.join(maybe, step)
             if os.path.exists(script):
                 runner = self.generate_runner_filename(step)
-                self.prepare_runner(runner, script, *args)
+                rundir = self.get_rundir(step)
+                self.prepare_runner(runner, script, rundir, *args)
                 self.runners[step] = runner
                 return runner
 
@@ -114,16 +109,22 @@ class ShimPackage(object):
     def run(self, step):
         runner = self.get_runner(step)
         from subprocess import Popen, PIPE, STDOUT
-        print 'Executing %s' % self.script
-        proc = Popen(runner, stdout=PIPE, stderr=STDOUT, 
-                     universal_newlines=True, env=self.env)
+        cmdline = [self.shell, runner]
+        print 'Executing %s' % ' '.join(cmdline)
+        try:
+            proc = Popen(cmdline, stdout=PIPE, stderr=STDOUT, 
+                         universal_newlines=True)
+        except OSError:
+            print 'Failed to run %s of %s/%s' % \
+                (runner, self.vars['package_name'], self.vars['package_version'])
+            raise
         out, err = proc.communicate()
         print out
         assert proc.returncode == 0, 'Shim returned err %d (%s)' % (proc.returncode, runner)
         return
 
 
-    def prepare_runner(self, filename, script, *args):
+    def prepare_runner(self, filename, script, rundir, *args):
         '''
         Prepare runner script writing into file object.
         '''
@@ -134,11 +135,21 @@ class ShimPackage(object):
         funcs = os.path.join(self.orch_dir, 'bash/orchestrate.sh')
 
         fp.write('#!/bin/bash\n')
+        #fp.write('set -x\n')
         fp.write('source %s\n' % funcs)
         for dep in self.dep_setup:
             fp.write('source %s\n' % dep)
         fp.write('source %s\n' % self.orch_environment_file())
-        fp.write('exec %s %s\n' % (script, ' '.join(args)))
+        if rundir:
+            fp.write('runcmd pushd %s >/dev/null 2>&1\n' % rundir)
+        fp.write('''if head -1 {script} | grep -q /bin/bash ; then 
+    source {script} {argstr}
+else 
+    exec %s %s
+fi
+'''.format(script=script, argstr = ' '.join(args)))
+        if rundir:
+            fp.write('runcmd popd > /dev/null 2>&1\n')
         return
 
     pass

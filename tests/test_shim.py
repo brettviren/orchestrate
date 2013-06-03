@@ -4,10 +4,10 @@ Test orchestrate.shim
 '''
 
 from orchestrate import shim
-
+import os
 def test_hello():
-    vars = dict(shim_dir = './shims/hello',
-                unpacked_dir = '/tmp/test_shim/unpacked',
+    vars = dict(shim_dir = os.path.abspath('./shims/hello'),
+                unpacked_dir = '/tmp/test_shim/source/hello-2.8',
                 install_dir = '/tmp/test_shim/install',
                 build_dir = '/tmp/test_shim/build',
                 source_dir = '/tmp/test_shim/source',
@@ -19,8 +19,7 @@ def test_hello():
     s = shim.ShimPackage(**vars)
 
     for step in s.steps:
-        fn = s.get_runner(step)
-        print fn
+        s.run(step)
 
 if '__main__' == __name__:
     test_hello()

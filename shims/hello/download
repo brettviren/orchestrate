@@ -1,7 +1,3 @@
 #!/bin/bash
 
-if [ -z "$ORCH_PACKAGE_URL" -o -z "$ORCH_SOURCE_DIR" ] ; then
-    exit 1
-fi
-
-#download $ORCH_PACKAGE_URL $ORCH_SOURCE_DIR
+orch_download

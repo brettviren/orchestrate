@@ -1,1 +1,2 @@
 #!/bin/bash
+orch_make install $ORCH_INSTALL_DIR/bin/hello
