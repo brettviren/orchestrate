@@ -15,13 +15,19 @@ fail () {
 }
 
 runcmd () {
-    echo "Running: $@"
+    echo "Running: $@ in $(pwd)"
     $@
     err=$?
     if [ "$err" != "0" ] ; then
 	exit $err
     fi
     return 0
+}
+goto () {
+    runcmd pushd $@ > /dev/null 2>&1
+}
+goback () {
+    popd > /dev/null 2>&1
 }
 
 # Prepend a value to a variable.  Default delimter is ":"
@@ -101,7 +107,7 @@ orch_unpack () {
 	creates=$ORCH_UNPACKED_DIR
     fi
 
-    runcmd pushd $where
+    goto $where
 
     if [ -d "$creates" -o -f "$creates" ] ; then
         idem "unpack: output directory for $what already exists: $creates"
@@ -122,7 +128,7 @@ orch_unpack () {
 
     if [ -d "$creates" -o -f "$creates" ] ; then return ; fi
 
-    cmd popd
+    goback
 
     fail "Failed to unpack $what to $creates in $where"
 }

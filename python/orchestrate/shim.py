@@ -6,28 +6,74 @@ Shim objects encapsulate what is needed to build a package.
 '''
 
 import os
+from subprocess import Popen, PIPE, STDOUT, check_call, CalledProcessError
 
+shell = '/bin/bash'
+
+def orch_share_directory(subdir):
+    'Find <subdir> in installed app area'
+    venvdir = os.environ.get('VIRTUAL_ENV')
+    if venvdir:                 # installed in virtual env
+        maybe = os.path.join(venvdir, 'share/orchestrate', subdir)
+        if os.path.exists(maybe):
+            return maybe
+
+    # in-source
+    maybe = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))),subdir)
+    if os.path.exists(maybe):
+        return maybe
+
+    return None
+
+
+def package_shim_directories(package, version, pathlist):
+    '''
+    Return a list of directories of package shims.
+    '''
+    ret = []
+    for path in pathlist:
+        pdir = os.path.join(path,package)
+        if not os.path.exists(pdir):
+            continue
+
+        vshim = os.path.join(pdir, 'version')
+
+        # no version shim script, assume applicable
+        if not os.path.exists(vshim):
+            ret.append(pdir)
+            continue
+
+        try:
+            check_call([shell, vshim, version])
+        except CalledProcessError:
+            continue
+
+        ret.append(pdir)
+        
+    return ret
     
-
-def locate_path(subpath, pathlist):
+def package_shim_script(name, pathlist):
     '''
-    Return first occurrence of a file named <subpath> found in an
-    element of the directory list <pathlist>.  A match is returned as
-    a full path or None.
+    Return the first instance of a shim script of given <name> in <pathlist>
     '''
-    for p in pathlist:
-        maybe = os.path.join(p, subpath)
+    for pdir in pathlist:
+        maybe = os.path.join(pdir, name)
         if os.path.exists(maybe):
             return maybe
     return None
+
+
+class ShimScript(object):
+    def __init__(self, script = None, **vars):
+        self.script = script
+        self.vars = vars
 
 class ShimPackage(object):
     '''
     A shim package.
     '''
 
-    shell = '/bin/bash'
-    steps = ['version', 'environment', 'dependencies', 'download',
+    steps = ['dependencies', 'environment', 'download',
              'unpack', 'prepare', 'build', 'install', 'validate']
 
     rundirs = {
@@ -40,17 +86,22 @@ class ShimPackage(object):
 
     required = ['package_name', 'package_version', 'package_url',
                 'source_dir', 'unpacked_dir', 'build_dir', 'install_dir',
-                'shim_dir']
+                'shim_path']
 
     def __init__(self, **vars):
 
         missing = set(self.required).difference(vars.keys())
         if missing:
             raise ValueError, 'Shim missing variables: %s' % (', '.join(missing),)
-        self.orch_dir = vars.get('orch_dir', 
-                                 os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+
         self.vars = vars
 
+        psd = package_shim_directories(vars['package_name'], vars['package_version'], 
+                                       vars['shim_path'].split(':'))
+        self.shim_scripts = {}
+        for step in self.steps:
+            self.shim_scripts[step] = package_shim_script(step, psd)
+        
         self.dep_setup = []
         self.runners = {}       # step->script to run
         return
@@ -101,29 +152,25 @@ class ShimPackage(object):
         runner = self.runners.get(step)
         if runner: return runner
 
+        script = self.shim_scripts[step]
+        if not script:
+            return None
+
         args = []
         if step == 'environment':
             args = [self.generate_runner_filename('env')]
         if step == 'dependencies':
             args = [self.generate_runner_filename('dep')]
 
-        for maybe in [self.vars['shim_dir'], self.orch_dir]:
-            script = os.path.join(maybe, step)
-            if os.path.exists(script):
-                runner = self.generate_runner_filename(step)
-                rundir = self.get_rundir(step)
-                self.prepare_runner(runner, script, rundir, *args)
-                self.runners[step] = runner
-                return runner
-
-        raise ValueError, 'No runner found for step "%s" of %s/%s' % \
-            (step, self.vars['package_name'], self.vars['package_version'])
-        
+        runner = self.generate_runner_filename(step)
+        rundir = self.get_rundir(step)
+        self.prepare_runner(runner, script, rundir, *args)
+        self.runners[step] = runner
+        return runner
 
     def run(self, step):
         runner = self.get_runner(step)
-        from subprocess import Popen, PIPE, STDOUT
-        cmdline = [self.shell, runner]
+        cmdline = [shell, runner]
         print 'Executing %s' % ' '.join(cmdline)
         try:
             proc = Popen(cmdline, stdout=PIPE, stderr=STDOUT, 
@@ -146,7 +193,7 @@ class ShimPackage(object):
             return
         fp = open(filename,'w')
 
-        funcs = os.path.join(self.orch_dir, 'bash/orchestrate.sh')
+        funcs = os.path.join(orch_share_directory('bash'),  'orchestrate.sh')
 
         fp.write('#!/bin/bash\n')
         #fp.write('set -x\n')
@@ -155,7 +202,7 @@ class ShimPackage(object):
             fp.write('source %s\n' % dep)
         fp.write('source %s\n' % self.orch_environment_file())
         if rundir:
-            fp.write('runcmd pushd %s >/dev/null 2>&1\n' % rundir)
+            fp.write('goto %s\n' % rundir)
         fp.write('''if head -1 {script} | grep -q /bin/bash ; then 
     source {script} {argstr}
 else 
@@ -163,7 +210,7 @@ else
 fi
 '''.format(script=script, argstr = ' '.join(args)))
         if rundir:
-            fp.write('runcmd popd > /dev/null 2>&1\n')
+            fp.write('goback\n')
         return
 
     pass

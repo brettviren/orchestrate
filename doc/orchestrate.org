@@ -96,8 +96,7 @@ The following sub-sections describe specifics about each step
 
 *** Version
 
-The =version= script may be implemented in order to signal that the requested package version can not be built by the package shim to which the script belongs.  In general it is expected that this step is left unimplemented except potentially to reject versions that are newer than existed when the script was last tested.   The requested package version string is available from =ORCH_PACKAGE_VERSION=.
-
+The =version= script may be implemented in order to signal that the requested package version can not be built by the package shim to which the script belongs.  In general it is expected that this step is left unimplemented except potentially to reject versions that are newer than existed when the script was last tested.   This script does not have a full =ORCH_= environment available.  It is given the requested version string as its single command line argument.  It should return a non-zero code to the calling environment if that version can not be built by its fellow package shim scripts.
 
 *** Dependencies
 
