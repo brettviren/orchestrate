@@ -1,0 +1,16 @@
+#!/bin/bash
+# setup a bash shell for running orch
+# use orch-shell to start a subshell
+
+if [ -f "$HOME/.bashrc" ] ; then
+    source $HOME/.bashrc
+fi
+
+orch_dir="$(dirname $(dirname $(readlink -f $BASH_SOURCE)))"
+orch_venv="$orch_dir/bootstrap/venv/bin/activate"
+if [ -f "$orch_venv" ] ; then
+    echo "Starting subshell under venv, type \"deactivate\" to exit"
+    source $orch_venv
+else
+    echo "No orchestrate virtualenv found, not starting orch-shell"
+fi

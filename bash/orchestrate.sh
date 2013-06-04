@@ -66,7 +66,7 @@ orch_download () {
     # try wget
     cmd=$(type -P -f wget)
     if [ -n "$cmd" ] ; then
-	runcmd $cmd -O $target $url
+	runcmd $cmd --no-check-certificate -O $target $url
 	return $?
     fi
 

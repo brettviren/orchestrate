@@ -1,0 +1,3 @@
+#!/bin/bash
+# Start a sub shell setup for running orchestration
+/bin/bash --rcfile $(dirname $BASH_SOURCE)/orch-setup
