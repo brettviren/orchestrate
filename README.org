@@ -1,0 +1,69 @@
+Orchestrate Installation of Software Packages
+
+* Overview
+
+Orchestrate automates the installation suites of packages from source.  
+
+Details are in the [[./doc/orchestrate.org][doc/orchestrate.org]].
+
+The orchestration is driven by a suite description file using a Python-based application and per-package Bash scripts.
+
+At least version Python 2.5 is needed as is the =pkg_resources= module.
+
+* Installation
+
+Orchestrate installs as a Python package in a few ways.  Which way is best to use depends on what the build host provides.  Each method is described below.
+
+** Bootstrap installation
+
+If the build host lacks a sufficiently new version of Python and/or =virtualenv= then it is recommended to use the [[./bash/bootstrap.sh]] script to install these.  To do that:
+
+#+BEGIN_EXAMPLE
+cd orchestrate/
+./bash/bootstrap.sh /path/to/venv [/path/to/temp]
+#+END_EXAMPLE
+
+If no temporary directory is given, one is generated in =/tmp=.
+After the bootstrap completes successfully the temporary directory may be removed.
+
+The resulting installation can be "activated" using the standard =virtualenv= mechanism:
+
+#+BEGIN_EXAMPLE
+source /path/to/venv/bin/activate
+#+END_EXAMPLE
+
+and later "deactivated" via:
+
+#+BEGIN_EXAMPLE
+deactivate
+#+END_EXAMPLE
+
+
+** Preparing your own environment
+
+If you want to provide your own Python environment it is still recommended to install Orchestrate into a =virtualenv=.  
+
+#+BEGIN_EXAMPLE
+virtualenv /path/to/venv
+#+END_EXAMPLE
+
+Then, install Orchestrate as described in the next section.
+
+** Existing environment
+
+Given an existing, suitable Python environment the orchestrate package can be installed with, for example, =pip=:
+
+#+BEGIN_EXAMPLE
+pip install /path/to/orchestrate-X.Y.tar.gz
+#+END_EXAMPLE
+
+** TODO: Installation from online package repository
+
+T.b.d, provide online PyPi-style package repository and configuration instructions.
+
+* Command Line Use
+
+Orchestrate is run via the command =orch=.
+
+
+

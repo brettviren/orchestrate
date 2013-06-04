@@ -1,27 +1,34 @@
 #!/bin/bash
 
-# orchestrate requires some Python facilities not found on lame distributions
-#
-# A non-paleolithic version of Python
-# Some modules not always provided by the system:
-# - pkg_resources
-#
-# To help the installer target systems which can not satisfy these
-# requirements, this script will install a recent Python and
-# virtualenv.  It will create a virtual env and populate it with extra
-# modules.
+# Install Python and Orchestrate from source
 
 python_version=2.7.5
 virtualenv_version=1.9.1
 
-top_dir="$(dirname $(dirname $(readlink -f $BASH_SOURCE)))"
-cd $top_dir
-echo "Top at $top_dir"
 
-source "$top_dir/bash/orchestrate.sh"
+if [ -n "$VIRTUAL_ENV" ] ; then
+    echo "Existing, virtual environment detected at $VIRTUAL_ENV"
+    exit 1
+fi
 
-bootstrap_dir="$top_dir/bootstrap"
-echo "bootstrap in $bootstrap_dir"
+install_dir="$1" ; shift
+temp_dir="$1" ; shift
+if [ -z "$install_dir" ] ; then
+    echo "usage: bootstrap.sh /path/to/venv [/path/to/temp_dir]"
+    exit 1
+fi
+
+if [ -z "$temp_dir" ] ; then
+    temp_dir=$(mktemp -d)
+fi
+if [ ! -d "$temp_dir" ] ; then
+    mkdir -p "$temp_dir"
+fi
+log=$temp_dir/bootstrap.log
+echo "Using temporary directory: $temp_dir, logging to $log" | tee $log
+
+orch_dir="$(dirname $(dirname $(readlink -f $BASH_SOURCE)))"
+source "$orch_dir/bash/orchestrate.sh"
 
 plain_configure () {
     local where=$1 ; shift
@@ -48,32 +55,57 @@ plain_make () {
     make $target
 }
 
-mypy="$bootstrap_dir/bin/python"
-myvenv="$bootstrap_dir/venv"
 
 # Idempotently install Python
-python_unpacked=Python-${python_version}
-python_tarball=${python_unpacked}.tgz
-python_url="http://python.org/ftp/python/${python_version}/${python_tarball}"
-orch_download "$python_url" "$bootstrap_dir"
-orch_unpack "$python_tarball" "$bootstrap_dir" "$python_unpacked"
-plain_configure "$bootstrap_dir/$python_unpacked" "$bootstrap_dir"
-plain_make "$bootstrap_dir/$python_unpacked" "" "pybuilddir.txt"
-plain_make "$bootstrap_dir/$python_unpacked" "install" "$mypy"
-
+mypy="$temp_dir/bin/python"
+do_python () {
+    python_unpacked=Python-${python_version}
+    python_tarball=${python_unpacked}.tgz
+    python_url="http://python.org/ftp/python/${python_version}/${python_tarball}"
+    orch_download "$python_url" "$temp_dir"
+    orch_unpack "$temp_dir/$python_tarball" "$temp_dir" "$python_unpacked"
+    plain_configure "$temp_dir/$python_unpacked" "$temp_dir"
+    plain_make "$temp_dir/$python_unpacked" "" "pybuilddir.txt"
+    plain_make "$temp_dir/$python_unpacked" "install" "$mypy"
+}
+echo "Installing Python" | tee -a $log
+do_python >> $log 2>&1
 
 # Unless on is already activated, install virtualenv and create one,
 # if needed, and activate it
-if [ -z "$VIRTUAL_ENV" ] ; then
-    if [ ! -d $myvenv ] ; then
-	virtualenv_unpacked=virtualenv-${virtualenv_version}
-	virtualenv_tarball=${virtualenv_unpacked}.tar.gz
-	virtualenv_url="https://pypi.python.org/packages/source/v/virtualenv/${virtualenv_tarball}"
-	orch_download "$virtualenv_url" "$bootstrap_dir"
-	orch_unpack "$virtualenv_tarball" "$bootstrap_dir" "$virtualenv_unpacked"
-	cd $bootstrap_dir/$virtualenv_unpacked/
-	$mypy virtualenv.py --distribute $myvenv
+do_venv () {
+    myvenv="$install_dir/bin/activate"
+    if [ -f $myvenv ] ; then
+	idem "virtualenv already installed in $install_dir"
+	return
     fi
-    source "$myvenv/bin/activate"
-fi
 
+    virtualenv_unpacked=virtualenv-${virtualenv_version}
+    virtualenv_tarball=${virtualenv_unpacked}.tar.gz
+    virtualenv_url="https://pypi.python.org/packages/source/v/virtualenv/${virtualenv_tarball}"
+    orch_download "$virtualenv_url" "$temp_dir"
+    orch_unpack "$temp_dir/$virtualenv_tarball" "$temp_dir" "$virtualenv_unpacked"
+    cd $temp_dir/$virtualenv_unpacked/
+    $mypy virtualenv.py --no-site-packages --distribute $install_dir
+}
+echo "Installing virtualenv" | tee -a $log 
+do_venv >> $log 2>&1
+
+echo "Activating virtualenv with $myvenv" | tee -a $log
+source "$myvenv"		# test
+
+
+do_install () {
+    if [ -d "$VIRTUAL_ENV/share/orchestrate" ] ; then
+	idem "orchestrate is already installed in $VIRTUAL_ENV/share/orchestrate"
+	return
+    fi
+
+    cd $orch_dir
+    python setup.py sdist
+    pip install $(ls dist/orchestrate-*.tar.gz|tail -1)
+}
+echo "Installing orchestrate" | tee -a $log
+do_install >> $log 2>&1
+
+echo "You may now delete $temp_dir"
