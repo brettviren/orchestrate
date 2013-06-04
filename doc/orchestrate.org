@@ -13,7 +13,7 @@
 #+LATEX: \pagebreak
 
 #+BEGIN_ABSTRACT
-This document describes a build orchestration system to assist in producing software installations made up of  suites of individual packages.  It allows for automation, coexistence of multiple versions and platforms, shared packages between suites.  It describes the major components and defines their interfaces.  This document focuses on a contract between a high level orchestration application, a configuration file and a collection per-package "shim scripts" that provide any special installation procedures specific to a package.
+This document describes a build orchestration system to assist in producing software installations made up of  suites of individual packages.  It allows for automation, coexistence of multiple versions and platforms, shared packages between suites.  It describes the major components and defines their interfaces.  The orchestration is performed through a contract between a high level orchestration application, a central configuration file and a collection per-package "shim scripts" that provide any special installation procedures specific to a package.
 #+END_ABSTRACT
 
 
@@ -21,10 +21,11 @@ This document describes a build orchestration system to assist in producing soft
 
 This /orchestration/ works through a contract between three major components:
 
- - A configuration file describing one or more suites with one suite named as a target.
- - An orchestration application that interprets this file, and directly performs some common installation actions while defers, when needed to
- - A per-package set of scripts performing well defined parts of an installation where the standard action which the application provides is not adequate.
+ - A configuration file describing one or more suites with one particular suite named as a target.
+ - An orchestration application that interprets this file, drives the installation but defers to external scripts for the details.
+ - A per-package set of "shim" scripts performing well defined parts of an installation where the standard action which the application provides is not adequate.
 
+Installation layout is described in the suite configuration, potentially in a parameterized way, interpreted on a per package bases by the application.  The application communicates the results to the shim scripts via environment variables which are then bound by the contract to use them.  Within these confines, the shim scripts are free to perform whatever actions are necessary to fulfill their goals.  A default set of shims are provided as part of the Orchestrate installation which, if adequate, need not be reimplemented for a particular package.
 
 * Orchestration Contract
 
@@ -33,9 +34,9 @@ The orchestration requires the participant components to honor a contract.  This
 
 ** Suite Configuration File
 
-A suite is a collection of packages of specific versions built with a consistent set of build options (qualifiers), installed in a common area following a layout pattern, for the same platform and intended to be used together in concert.  Different suites may have overlap.  
+A suite is a collection of packages of specific versions built with a consistent set of build options (aka qualifiers) referred to as "tags", installed in a common area following a layout pattern, for the same platform and intended to be used together in concert.  Different suites may have overlap.  
 
-Suites are fully specified in a text configuration file.  This file provides an expressive and flexible format that can succinctly describe multiple suites of multiple versions and platform flavors or build qualifiers.  Providing the user with this configuration file, the orchestration application and the name of a desired suite is enough for them to produce an installation.  The application, with the help of the shim scripts, will handle locating installation directories, retrieving source code and building, installing and validating the packages as well as managing the user environment.
+Suites are fully specified in a configuration file.  This file provides an expressive and flexible format that can succinctly describe multiple suites of multiple versions and platform flavors or build qualifiers.  Providing the user with this configuration file, the orchestration application and the name of a desired suite is enough for them to produce an installation.  The application, with the help of the shim scripts, will handle locating installation directories, retrieving source code and building, installing and validating the packages as well as managing the user environment.
 
 The syntax of the configuration file follows a format sometimes called "INI".  It consists of a number of titled sections which contain key/value pairs.  Section titles are written in the form =[<type> <name>]= except for one special =[global]= section.  A section =<type>= is a single word and the =<name>= may consist of one or more words.  The payload of each section is a collection of key/value pairs, one per line.  
 Keys and values are separated either by a "=:=" or a "===".  Comments begin with "=#=".
@@ -61,36 +62,19 @@ Additional variables defined by the orchestration application may also be used. 
 
 Each package gets its own copy of the variables independently interpolated.  These variables are communicated to the shim scripts through the executing environment.  Their names are up-cased and have =ORCH_= prepended.  There is a set of required variables, listed below.  If they are not provided the application will abort.  Additional variables needed for specific package shims may also be defined.
 
-There are also package variables required by the orchestration application directly:
+There are also variables that the orchestration application directly interprets:
 
- - =shim_url= :: The URL to the package shim as described below.  
+ - =shim_path= :: used to locate package shim scripts (more below)
 
 A partial example suite configuration file is provided in [[../tests/test.cfg][tests/test.cfg]].
 
-** Orchestration Application
-
-The orchestration application interprets the configuration file and performs the global installation.   It directly implements some installation steps unless the package provides a shim script that overrides this default behavior.  
-The steps and the default behavior which the application provides are:
-
- - =version= :: no-op
- - =environment= :: no-op
- - =dependencies= :: no-op
- - =download= :: downloads the source as determined by the =source_url=
- - =unpack= :: unpack the source archive file
- - =prepare= :: no-op
- - =build= :: no-op
- - =install= :: no-op
- - =validate= :: no-op
-
-As can be seen, most steps are non-operations but additional functionality may be provided by the application in the future.
-
-** Shim Scripts
+** Package Shim Scripts
 
 Each package provides a set of shim scripts that override the default behavior provided by the application.  Most are required but some are optional.  The steps and their requirements are listed below.  
 
  - =version= :: check if the requested package version is supported by the shim
- - =environment= :: produce a file containing shell environment settings needed to use the package
  - =dependencies= :: produce a dependency file
+ - =environment= :: produce a file containing shell environment settings needed to use the package
  - =download= :: get the package source code 
  - =unpack= :: unpack the source archive file
  - =prepare= :: run any required configuration or patching of the source code
@@ -100,9 +84,9 @@ Each package provides a set of shim scripts that override the default behavior p
 
 Some general rules governing the shim scripts:
 
- - A script files which implements a step them must take the same name as the step it implements. 
+ - A script file which implements a step must take the same name as the step it implements. 
  - Any step which is not required or is not applicable for a given package may simply be omitted.  
- - Each process must exit immediately and return a non-zero return code to the calling environment if any error is encountered.   
+ - Each shim script must exit immediately and return a non-zero return code to the calling environment if any error is encountered.   
  - Any standard output or standard error produced is logged by the application but otherwise not considered by the application (see the =ORCH_LOG= variable below).  
  - Some scripts are given command line arguments and all may check environment variables set by the application as described below.  
  - From the point of view of the package shim the scripts are executed in the order listed above.  However the application may do either a depth-first or a breadth-first descent when dealing with a full suite of packages.
@@ -112,7 +96,38 @@ The following sub-sections describe specifics about each step
 
 *** Version
 
-The =version= script may be implemented in order to signal that the requested package version can not be built by the shim.  In general it is expected that this step is left unimplemented except potentially to reject versions that are newer than existed when the script was last tested.   The version is available from =ORCH_PACKAGE_VERSION=.
+The =version= script may be implemented in order to signal that the requested package version can not be built by the package shim to which the script belongs.  In general it is expected that this step is left unimplemented except potentially to reject versions that are newer than existed when the script was last tested.   The requested package version string is available from =ORCH_PACKAGE_VERSION=.
+
+
+*** Dependencies
+
+This script is given a single command line argument which is to be interpreted as a file name in which to write descriptions of any packages on which this package depends.  The dependency may include a /version constraint string/.  If constraints are given they will be checked for consistency against the requested versions of the packages by the application.  Any failed constraints will abort the application.  The build is also aborted if any packages are listed but are are not specified in the suite description.
+
+The dependency information is written in the following form, one line per dependent package:
+
+#+BEGIN_EXAMPLE
+<package name> [<constraint>]
+#+END_EXAMPLE
+
+The version constraint is optional but should be specified if there is any sensitivity to the requested package version.  The version constraint can consist of multiple =<constraint>= separated by "=and=" or "=or=" operators or be a /version inequality/.  A version inequality is specified as the literal =version= and inequality operator and a version string:
+
+#+BEGIN_EXAMPLE
+version <operator> <version string>
+#+END_EXAMPLE
+
+The operator can be any of these inequalities which have the expected meanings:
+
+#+BEGIN_EXAMPLE
+< <= == != => >
+#+END_EXAMPLE
+
+Some example dependency lines:
+
+#+BEGIN_EXAMPLE
+simplepackage
+carefulpackage version >= 1.0 and version < 2.0
+bugpackage version != 3.14159
+#+END_EXAMPLE
 
 *** Environment
 
@@ -121,27 +136,6 @@ should be made about the calling environment.
 
 The environment produced by sourcing the result of this shim script is not used to provide environment for the shim scripts of the package itself.  It is, however, used to provide environment setup for shim scripts of any other packages that depend on this package (except for the =version= and =environment= shim scripts).
 
-*** Dependencies
-
-This script is given a single command line argument which is to be interpreted as a file name in which to write descriptions of any packages on which this package depends.  The dependency may include a version constraint which may be based on the requested package version.  If constraints are given they will be checked for consistency against the requested versions of the packages.  The build is aborted if any dependencies are listed which are not specified in the suite description.
-
-The dependency information is written in the following form, one line per dependent package:
-
-#+BEGIN_EXAMPLE
-<package name> [<optional version constraint>]
-#+END_EXAMPLE
-
-The version constraint is optional and should be specified if there is a sensitivity to the requested package version.  The version constraint is written like:
-
-#+BEGIN_EXAMPLE
-<operator> <version string>
-#+END_EXAMPLE
-
-The operator can be any inequality:
-
-#+BEGIN_EXAMPLE
-< <= == != => >
-#+END_EXAMPLE
 
 *** Download
 
@@ -170,22 +164,22 @@ Any post-installation validation can be implemented in the =validate= shim scrip
 
 ** Locating a Package Shim
 
-A package shim must be located by specifying a URL of the form:
+A package shim is a directory of shim scripts.  The directory is named after the package which it builds and the shim scripts are named after the step they implement.  The application locates a package shim directories by searching a shim path.  This path is built by appending any instances found in:
 
-#+BEGIN_EXAMPLE
-<scheme>://<domain>/<path>[?options]
-#+END_EXAMPLE
+ - The =ORCH_SHIM_PATH= variable from the environment calling the orchestration application
+ - The =shim_path= variable set sections of the suite configuration sections:
+   - =package=
+   - =suite=
+   - =global=
+ - In =shims= directory provided by the application.
 
-The supported schemes are:
+The two shim path variables values may themselves hold colon-separated paths.  The final shim path is composed by concatenating all paths in the order listed above.
 
- - web :: that is, =http=, =https= or =ftp= where the =<path>= is expected to point to an archive file.
- - VCS :: =svn= or =git= version control systems where the =<path>= is expected to point at the top of the repository tree.  The scheme may be of a compound form =<VCS>+<VCSURL>=, for example =git+https= or =svn+ssh=.
+Any given shim script is determined by first locating all package shim directories found in the shim path.  If any directory contains a =version= script it is executed to determine if the package shim is applicable.  If not, it  is dropped.  Finally, the first matching shim script is taken.  This provides a mechanism to override certain shim scripts on a package and version basis.
 
-Options can be specified in the form of =key=value=.  Understood options are:
+** Automating the downloading of custom shim scripts.
 
- - =target= :: In the case of an archive file this specifies the directory produced by its unpacking.  By default the directory is assumed to be named identically to the archive file less its extension.  In the case of a VCS the repository will be checked out (cloned) to this directory.
- - =shims= :: specify the directory relative to the target which contains the shim scripts.  Default is =shims/=.
- - =tag= :: specify a tag or a branch in git (SVN should encode this into =shims=)
+T.B.D.
 
 ** Shim Script Execution Environment
 

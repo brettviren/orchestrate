@@ -7,6 +7,20 @@ Shim objects encapsulate what is needed to build a package.
 
 import os
 
+    
+
+def locate_path(subpath, pathlist):
+    '''
+    Return first occurrence of a file named <subpath> found in an
+    element of the directory list <pathlist>.  A match is returned as
+    a full path or None.
+    '''
+    for p in pathlist:
+        maybe = os.path.join(p, subpath)
+        if os.path.exists(maybe):
+            return maybe
+    return None
+
 class ShimPackage(object):
     '''
     A shim package.
