@@ -6,9 +6,10 @@ Shim objects encapsulate what is needed to build a package.
 '''
 
 import os
-from subprocess import Popen, PIPE, STDOUT, check_call, CalledProcessError
+import proc
 
 shell = '/bin/bash'
+
 
 def orch_share_directory(subdir):
     'Find <subdir> in installed app area'
@@ -24,7 +25,6 @@ def orch_share_directory(subdir):
         return maybe
 
     return None
-
 
 def package_shim_directories(package, version, pathlist):
     '''
@@ -43,10 +43,12 @@ def package_shim_directories(package, version, pathlist):
             ret.append(pdir)
             continue
 
-        try:
-            check_call([shell, vshim, version])
-        except CalledProcessError:
-            continue
+        env = dict(os.environ)
+        env['ORCH_PACKAGE_VERSION'] = version
+        cmdstr = '%s %s' % (shell, vshim)
+        rc = proc.run(cmdstr, env)
+        if rc != 0:
+            raise RuntimeError, 'Command returned non-zero error %d: %s' % (rc, cmdstr)
 
         ret.append(pdir)
         
@@ -62,6 +64,23 @@ def package_shim_script(name, pathlist):
             return maybe
     return None
 
+def package_shim_dependencies(pathlist):
+    '''
+    Return the contents of the result file from the "dependencies"
+    shim script as a list of (package name, optional version
+    contraint) tuples
+    '''
+    dep_shim = package_shim_script('dependencies', pathlist)
+    if not dep_shim: return []
+        
+    cmdstr = '%s %s' % (shell, dep_shim)
+    env = dict(os.environ)
+    env['ORCH_PACKAGE_VERSION'] = version
+    rc = proc.run(cmdstr, env)
+    if rc != 0:
+        raise RuntimeError, 'Command returned non-zero error %d: %s' % (rc, cmdstr)
+    
+    return
 
 class ShimScript(object):
     def __init__(self, script = None, **vars):
@@ -98,6 +117,7 @@ class ShimPackage(object):
 
         psd = package_shim_directories(vars['package_name'], vars['package_version'], 
                                        vars['shim_path'].split(':'))
+
         self.shim_scripts = {}
         for step in self.steps:
             self.shim_scripts[step] = package_shim_script(step, psd)
@@ -170,18 +190,14 @@ class ShimPackage(object):
 
     def run(self, step):
         runner = self.get_runner(step)
-        cmdline = [shell, runner]
-        print 'Executing %s' % ' '.join(cmdline)
-        try:
-            proc = Popen(cmdline, stdout=PIPE, stderr=STDOUT, 
-                         universal_newlines=True)
-        except OSError:
-            print 'Failed to run %s of %s/%s' % \
+        cmdstr = '%s %s' % (shell, runner)
+        print 'Executing %s' % cmdstr
+
+        rc = proc.run(cmdstr)
+        if rc != 0:
+            msg = 'Failed to run %s of %s/%s' % \
                 (runner, self.vars['package_name'], self.vars['package_version'])
-            raise
-        out, err = proc.communicate()
-        print out
-        assert proc.returncode == 0, 'Shim returned err %d (%s)' % (proc.returncode, runner)
+            raise RuntimeError, msg
         return
 
 

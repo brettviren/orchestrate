@@ -27,6 +27,7 @@ This /orchestration/ works through a contract between three major components:
 
 Installation layout is described in the suite configuration, potentially in a parameterized way, interpreted on a per package bases by the application.  The application communicates the results to the shim scripts via environment variables which are then bound by the contract to use them.  Within these confines, the shim scripts are free to perform whatever actions are necessary to fulfill their goals.  A default set of shims are provided as part of the Orchestrate installation which, if adequate, need not be reimplemented for a particular package.
 
+
 * Orchestration Contract
 
 The orchestration requires the participant components to honor a contract.  This contract governs the set of variable names describing an installation, the steps into which an installation is partitioned and the behavior of the shim scripts that provide per-package custom installation actions.  
@@ -204,6 +205,7 @@ While not strictly part of the protocol, to be well behaved, the shim scripts sh
  - idempotent :: rerunning a shim script should not cause repetition of previous successfully applied actions
  - strict :: any error produced during any action by the shim script should cause a clear message to be printed and an immediate termination of the shim script in a way that communicates a non-zero return code to the calling environment
  - regular :: a high level of shim code reuse is expected as many packages share similar installation actions.  A collection of such are available as described in section [[sec:bash]].  Many shim scripts do not need to be written as some common steps are implemented directly in the orchestration application.
+
 
 * Orchestration Applications
 

@@ -5,7 +5,7 @@ Procedures and objects for an orchestration suite.
 
 import os
 import re
-from ConfigParser import SafeConfigParser, NoOptionError
+from ConfigParser import SafeConfigParser # , NoOptionError
 
 def read_config(fname):
     cfg = SafeConfigParser()
@@ -121,10 +121,12 @@ def resolve(cfg, suitename = None):
 
     pkgobjs = []
     for pkgname, pkgver in cfg.items('packagelist %s' % packagelist):
-        print pkgname, pkgver
+        #print pkgname, pkgver
         pkg_sec = get_package_section(cfg, pkgname, pkgver)
         d = dict(globals)
         d.update(defaults)
+        d.setdefault('package_name', pkgname)
+        d.setdefault('package_version', pkgver)
         d.setdefault('package', pkgname)
         d.setdefault('version', pkgver)
         d.update(pkg_sec)
