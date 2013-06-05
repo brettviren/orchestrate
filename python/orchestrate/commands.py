@@ -45,6 +45,6 @@ class ListCommand(object):
                 s.get_runner(step) # trigger dep_setup to be filed
                 print '\t%s: %s' % (step, s.shim_scripts[step])
             for dep in s.dep_setup:
-                print '\tdep: %s' % dep
+                print '\tdep: %s' % str(dep)
 
         return

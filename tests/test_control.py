@@ -14,5 +14,11 @@ def test_list():
     '''
     control.main(['-c',os.path.join(testdir,'test.cfg'),'list'])
 
+def test_suite():
+    '''
+    Install a suite
+    '''
+    control.main(['-c',os.path.join(testdir,'test.cfg'),'step',])
+
 if '__main__' == __name__:
     test_list()

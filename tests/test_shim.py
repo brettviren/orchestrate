@@ -6,6 +6,9 @@ Test orchestrate.shim
 from orchestrate import shim
 import os
 
+import logging
+logging.basicConfig(filename='/dev/stdout', level=logging.DEBUG)
+
 def get_shim_path():
     'Build canonical, full shim path'
     shim_path = []
@@ -40,6 +43,10 @@ def test_hello():
 
 
     s = shim.ShimPackage(**vars)
+
+    print 'orch env file:', s.orch_env_file
+    print 'pkg env file:', s.pkg_env_file
+    print 'deps:', s.dep_ver
 
     for step in s.steps:
         s.run(step)

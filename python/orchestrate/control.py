@@ -42,7 +42,7 @@ def main(argv = None):
     parser = build_parser()
     opts = parser.parse_args(argv)
 
-    logging.basicConfig(filename=opts.log, level=logging.INFO)
+    logging.basicConfig(filename=opts.log, level=logging.DEBUG)
 
     orch = app.Orchestrate(opts.config, opts.suite)
 

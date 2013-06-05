@@ -4,7 +4,7 @@
 
 
 msg () {
-    echo "$@" 1>&2
+    echo "$@"
 }
 idem () {
     msg "IDEM: $@"

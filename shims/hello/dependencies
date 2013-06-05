@@ -2,3 +2,5 @@
 
 depfile=$1
 echo "hello dependencies got $depfile"
+echo "bc" >> $depfile
+echo "emacs version >= 24" >> $depfile

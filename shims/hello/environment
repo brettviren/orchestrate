@@ -1,1 +1,8 @@
 #!/bin/bash
+envfile=$1 ; shift
+echo "hello environment generating into $envfile"
+cat <<EOF >> $envfile
+prepend PATH \$ORCH_INSTALL_DIR/bin
+prepend MANPATH \$ORCH_INSTALL_DIR/man
+prepend INFOPATH \$ORCH_INSTALL_DIR/info
+EOF
