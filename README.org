@@ -4,11 +4,11 @@ Orchestrate Installation of Software Packages
 
 Orchestrate automates the installation suites of packages from source.  
 
-Details are in the [[./doc/orchestrate.org][doc/orchestrate.org]].
+Details of the design and use of Orchestrate are in the [[./doc/orchestrate.org][doc/orchestrate.org]].
 
 The orchestration is driven by a suite description file using a Python-based application and per-package Bash scripts.
 
-At least version Python 2.5 is needed as is the =pkg_resources= module.
+Python versions before and including 2.4 is not supported.  Python 2.7 is recommended.  Other versions are not guaranteed to work.
 
 * Installation
 
