@@ -57,13 +57,25 @@ Given an existing, suitable Python environment the orchestrate package can be in
 pip install /path/to/orchestrate-X.Y.tar.gz
 #+END_EXAMPLE
 
+** In-source use
+
+Orchestrate can be run directly from the source if a suitable Python environment exists.  All that is needed is to locate its Python modules.
+
+#+BEGIN_EXAMPLE
+export PYTHONPATH=/path/to/orchestrate/python
+#+END_EXAMPLE
+
 ** TODO: Installation from online package repository
 
 T.b.d, provide online PyPi-style package repository and configuration instructions.
 
 * Command Line Use
 
-Orchestrate is run via the command =orch=.
+Orchestrate is run via the command =orch= except this doesn't yet exist.  For now the unit tests can drive the code.  For example:
+
+#+BEGIN_EXAMPLE
+python tests/test_app.py
+#+END_EXAMPLE
 
 
 
