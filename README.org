@@ -73,6 +73,10 @@ T.b.d, provide online PyPi-style package repository and configuration instructio
 
 Orchestrate is run via the command =orch= except this doesn't yet exist.  For now the unit tests can drive the code.  For example:
 
+* Configuration
+
+The [[./doc/orchestrate.org][doc/orchestrate.org]] doc should be consulted.  The [[./tests/test.cfg]] file is a simple example used by the tests.
+
 #+BEGIN_EXAMPLE
 python tests/test_app.py
 #+END_EXAMPLE
