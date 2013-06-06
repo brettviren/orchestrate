@@ -6,7 +6,14 @@ import logging
 
 from subprocess import Popen, PIPE, STDOUT, CalledProcessError
 
-def run(cmdstr, env=None, logout=logging.info, logerr=logging.warning):
+def logout(text):
+    'Default standard output logger'
+    logging.info(text.strip())
+def logerr(text):
+    'Default standard error logger'
+    logging.warning(text.strip())
+
+def run(cmdstr, env=None, logout=logout, logerr=logerr):
     '''
     Run the command <cmdstr> and return its error code.
 
@@ -14,7 +21,9 @@ def run(cmdstr, env=None, logout=logging.info, logerr=logging.warning):
     Otherwise the callers environment is used.
 
     The callable objects <logout> or <logerr>, if defined, are passed
-    stdout/stderr, respectively, of the command as it runs.
+    stdout/stderr, respectively, of the command as it runs.  Log lines
+    are passed unfiltered.  In particular any trailing newlines are
+    left intact.
     '''
 
     stdout, stderr = None, None

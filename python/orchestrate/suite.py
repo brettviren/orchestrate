@@ -5,7 +5,10 @@ Procedures and objects for an orchestration suite.
 
 import os
 import re
+
 from ConfigParser import SafeConfigParser # , NoOptionError
+
+from util import version_consistent
 
 def read_config(fname):
     cfg = SafeConfigParser()
@@ -24,20 +27,6 @@ def package_sections(sections, package):
             #print 'Checking %s' % (sec,)
             ret.append(sec)
     return ret
-
-def version_consistent(version, constraint):
-    '''
-    Return true if the constraint string is consistent with the version string.
-    '''
-    from pkg_resources import parse_version
-    cleaned = []
-    for token in [x.strip() for x in constraint.split()]:
-        if token in ['version','and','or','==','!=','<','>','<=','>=']:
-            cleaned.append(token)
-            continue
-        cleaned.append('pv("%s")' % token)
-    code = ' '.join(cleaned)
-    return eval(code, {'version':parse_version(version), 'pv':parse_version})
 
 def section_constraint(section, type='package'):
     '''Return a constraint from a section title or None.

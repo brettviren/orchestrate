@@ -42,9 +42,8 @@ class ListCommand(object):
         for s in app.shims:
             print '{package}/{version} using:'.format(**s.vars)
             for step in s.steps:
-                s.get_runner(step) # trigger dep_setup to be filed
                 print '\t%s: %s' % (step, s.shim_scripts[step])
-            for dep in s.dep_setup:
+            for dep in s.dep_ver:
                 print '\tdep: %s' % str(dep)
 
         return

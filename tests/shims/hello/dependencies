@@ -2,6 +2,5 @@
 
 depfile=$1
 echo "hello dependencies got $depfile"
-# fake dependency:
 echo "bc" | tee -a $depfile
 

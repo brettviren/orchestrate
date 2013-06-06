@@ -9,7 +9,7 @@ import os
 import proc
 import tempfile
 import logging
-
+from util import version_consistent
 shell = '/bin/bash'
 
 
@@ -28,32 +28,37 @@ def orch_share_directory(subdir):
 
     return None
 
-def package_shim_directories(pathlist, package, env = None):
+def package_shim_directories(pathlist, named, env = None):
     '''
     Return a list of directories from the given <pathlist> which
-    contain a <package> shim script.  If a "version" shim script is
-    found, run it in the given environment <env> and only keep that
-    package shim if the "version" shim script returns 0 error code.
+    contain directory in <named> (a string or list of strings).  If a
+    "version" shim script is found in a directory, run it in the given
+    environment <env> and only keep the directory if a zero error code
+    is returned.
     '''
+    if isinstance(named, basestring):
+        named = [named]
+
     ret = []
-    for path in pathlist:
-        pdir = os.path.join(path,package)
-        if not os.path.exists(pdir):
+    for name in named:
+        for path in pathlist:
+            pdir = os.path.join(path, name)
+            if not os.path.exists(pdir):
+                continue
+
+            vshim = os.path.join(pdir, 'version')
+
+            # no version shim script, assume applicable
+            if not os.path.exists(vshim):
+                ret.append(pdir)
+                continue
+
+            cmdstr = '%s %s' % (shell, vshim)
+            rc = proc.run(cmdstr, env=env)
+            if rc == 0:
+                ret.append(pdir)
+
             continue
-
-        vshim = os.path.join(pdir, 'version')
-
-        # no version shim script, assume applicable
-        if not os.path.exists(vshim):
-            ret.append(pdir)
-            continue
-
-        cmdstr = '%s %s' % (shell, vshim)
-        rc = proc.run(cmdstr, env=env)
-        if rc == 0:
-            ret.append(pdir)
-
-        continue
         
     return ret
     
@@ -67,29 +72,35 @@ def package_shim_script(name, pathlist):
             return maybe
     return None
 
-def package_shim_dependencies(pathlist, env):
+def package_shim_dependencies(script, env):
     '''
     Return the package dependencies by running the first
     "dependencies" shim script found in <pathlist> in the given <env>
     environment.  Return a list of (<package>, <optional constraint>)
     tuples.
     '''
-    dep_shim = package_shim_script('dependencies', pathlist)
-    if not dep_shim: 
+    
+    # for debugging
+    pv = '%s/%s' % (env['ORCH_PACKAGE_NAME'], env['ORCH_PACKAGE_VERSION'])
+
+    if not script: 
+        logging.debug('no dependencies shim for package %s' % pv)
         return []
         
     fd, fn = tempfile.mkstemp()
 
-    cmdstr = ' '.join([shell, dep_shim, fn])
+    cmdstr = ' '.join([shell, script, fn])
     rc = proc.run(cmdstr, env=env)
     if rc != 0:
-        raise RuntimeError, 'Command returned non-zero error %d: %s' % (rc, cmdstr)
+        raise RuntimeError, '%s dependencies command returned non-zero error %d: %s' % \
+            (pv, rc, cmdstr)
     
-    os.close(fd)
+    #os.close(fd)
     fd = open(fn)
     ret = []
     for line in fd.readlines():
         line = line.strip()
+        #logging.debug('%s dependency line: "%s"' % (pv, line))
         if not line: continue
         line = line.split(' ',1)
         ret.append((line[0], line[1:]))
@@ -116,6 +127,36 @@ def package_shim_environment(filename, pathlist, env):
     if rc != 0:
         raise RuntimeError, 'Command returned non-zero error %d: %s' % (rc, cmdstr)
 
+    return
+
+def shims_in(shimlist, name, constraint = None):
+    '''
+    Return list of all shim objects in <shimlist> with the given name.
+    If a constraint is given then a shim must satisfy it to be
+    returned.
+    '''
+    ret = []
+    for s in shimlist:
+        if name != s.name:
+            continue
+        if not constraint or version_consistent(s.version, constraint):
+            ret.append(s)
+            continue
+        continue
+    return ret
+
+def check_deps(shimlist):
+    '''Check that all shims in <shimlist> have dependencies and any
+    version constraints satisfied by another shim in <shimlist>.
+    Raises ValueError if check fails'''
+    for s in shimlist:
+        for dname, dconstraint in s.dep_ver:
+            dshims = shims_in(shimlist, dname, dconstraint)
+            if not dshims:
+                msg = 'check dependency failed: no package "%s" to satisfy "%s" (constraint="%s") from dependencies file: %s' % (dname, s.name, dconstraint, s.shim_scripts.get('dependencies', '(none)'))
+                raise ValueError, msg
+            continue
+        continue
     return
 
 
@@ -147,15 +188,28 @@ class ShimPackage(object):
         # find packages - calls the "version" shim scripts
         self.vars = vars
         env = {'ORCH_%s'%k.upper():v for k,v in vars.items()}
+
+        shim_names = []
+        for varname in ['shim_name','package_name','shim_fallback']:
+            n = vars.get(varname)
+            if not n: continue
+            for maybe in [x.strip() for x in n.split(',')]:
+                if maybe not in shim_names:
+                    shim_names.append(maybe)
+
+        logging.debug('Trying shim names: %s' % ', '.join(shim_names))
         psd = package_shim_directories(vars['shim_path'].split(':'), 
-                                       vars['package_name'], env)
+                                       shim_names, env)
+        logging.debug('Using shim directories: %s' % ', '.join(psd))
 
         # Determine the dependencies, if any, for this package
-        self.dep_ver = package_shim_dependencies(psd, env)
+        dep_shim = package_shim_script('dependencies', psd)
+        self.dep_ver = package_shim_dependencies(dep_shim, env)
         self.dep_setup = []
 
         # resolve shim script locations 
         self.shim_scripts = {}
+        self.shim_scripts['dependencies'] = dep_shim
         for step in self.steps:
             self.shim_scripts[step] = package_shim_script(step, psd)
 
@@ -171,7 +225,20 @@ class ShimPackage(object):
         package_shim_environment(self.pkg_env_file, psd, env)
 
         self.runners = {}       # step->script to run
+        for step in self.steps:
+            self.get_runner(step) # trigger dep_setup to be filed
+
         return
+
+
+    @property
+    def name(self):
+        'Get the name of the package this shims'
+        return self.vars['package_name']
+    @property
+    def version(self):
+        'Get the version string of the package this shims'
+        return self.vars['package_version']
 
     def get_gen_dir(self):
         odir = os.path.join(self.vars['build_dir'],'orch')

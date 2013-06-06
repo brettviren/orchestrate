@@ -1,0 +1,8 @@
+#!/bin/bash
+hw=$("$ORCH_INSTALL_DIR/bin/hello")
+if [ -z "$(echo $hw | grep 'Hello, world')" ] ; then
+    fail "Got unexpected response from hello: \"$hw\""
+else
+    msg "Hello is installed okay"
+fi
+

@@ -21,16 +21,16 @@ This document describes a build orchestration system to assist in producing soft
 
 This /orchestration/ works through a contract between three major components:
 
- - A configuration file describing one or more suites with one particular suite named as a target.
- - An orchestration application that interprets this file, drives the installation but defers to external scripts for the details.
- - A per-package set of "shim" scripts performing well defined parts of an installation where the standard action which the application provides is not adequate.
+ - A configuration file describing one or more suites of software packages with one particular suite named as a target.
+ - An orchestration application that interprets this file, drives the installation but defers to external scripts for installation details.
+ - A package-specific cascade of a set of "shim" scripts which perform the actual installation actions.
 
-Installation layout is described in the suite configuration, potentially in a parameterized way, interpreted on a per package bases by the application.  The application communicates the results to the shim scripts via environment variables which are then bound by the contract to use them.  Within these confines, the shim scripts are free to perform whatever actions are necessary to fulfill their goals.  A default set of shims are provided as part of the Orchestrate installation which, if adequate, need not be reimplemented for a particular package.
+Layout of temporary build files and final installation directories are described in the suite configuration.  This description is written using parameters which are interpreted on a per package bases by the application.  The application communicates the results to the shim scripts via environment variables.  A subset of variables are predefined and guaranteed to exist and the shim scripts are contracted to honor them during their actions.  Additional variables may be added on a per-package basis for special use by the shim scripts.  Within these confines, the shim scripts are free to perform whatever actions are necessary to fulfill their goals.  
 
 
 * Orchestration Contract
 
-The orchestration requires the participant components to honor a contract.  This contract governs the set of variable names describing an installation, the steps into which an installation is partitioned and the behavior of the shim scripts that provide per-package custom installation actions.  
+The orchestration requires the participant components to honor a contract.  This contract governs the definition of a set of variable describing an installation, the steps into which an installation is partitioned and the behavior of the shim scripts that provide per-package custom installation actions.  
 
 
 ** Suite Configuration File
@@ -161,25 +161,35 @@ Moving or copying the build results to their final installation location is done
 
 Any post-installation validation can be implemented in the =validate= shim script.  It is run from the =ORCH_INSTALL_DIR=.
 
-
 ** Locating a Package Shim
 
-A package shim is a directory of shim scripts.  The directory is named after the package which it builds and the shim scripts are named after the step they implement.  The application locates a package shim directories by searching a shim path.  This path is built by appending any instances found in:
+A /package shim/ is a named collection of /shim scripts/.  The shim scripts must exist in a directory sharing the same name as the package shim and shim scripts themselves must share the same name as the installation step they implement.  Package shim directories are located by searching an ordered /shim path/ but may be disqualified if they do not provide shim scripts that are compatible with the requested package version (as determined by running a =version= shim script, if it exists). For any given step, the first shim script found along this path in a qualified directory is used.
 
+*** Package Shim Name
+
+By default the package shim name is take to be that of the package itself.  This can be changed by explicitly setting the =shim_name= in the =package= section of the configuration.  A =shim_fallback= can also be specified (default is =default=) in order to specify a fallback.  
+
+Note, in order to be generic, the default shim scripts provided by the application are not idempotent.  Relying on them may result in unnecessary repetition of actions if the application is rerun.
+
+*** Shim Path
+
+The application builds a shim path from several prioritized sources.  They are:
+
+ - Zero or more command line flags ('=-s/-shims/=')
  - The =ORCH_SHIM_PATH= variable from the environment calling the orchestration application
  - The =shim_path= variable set sections of the suite configuration sections:
    - =package=
    - =suite=
    - =global=
- - In =shims= directory provided by the application.
+ - Built-in directories provided by the application.
 
-The two shim path variables values may themselves hold colon-separated paths.  The final shim path is composed by concatenating all paths in the order listed above.
+A portion of a shim path specified from any of these sources may itself be a colon-separated path.
+The final shim path is composed by concatenating all paths in the order listed above.
 
-Any given shim script is determined by first locating all package shim directories found in the shim path.  If any directory contains a =version= script it is executed to determine if the package shim is applicable.  If not, it  is dropped.  Finally, the first matching shim script is taken.  This provides a mechanism to override certain shim scripts on a package and version basis.
 
 ** Automating the downloading of custom shim scripts.
 
-T.B.D.
+T.B.D.  A feature to be added is to specify a =shim_url= in the configuration to cause package shims to be downloaded and unpacked into the shim path.
 
 ** Shim Script Execution Environment
 
@@ -188,11 +198,11 @@ the results of the =environment= shim scripts for the  packages returned by recu
 
 The following orchestration environment variable are guaranteed to be defined in the environment executing a shim script.
 
- - =ORCH_LOG= :: a log file to which the shim may append messages
+ - =ORCH_LOG= :: a log file to which the shim may append messages (script should not truncate!)
  - =ORCH_PACKAGE_NAME= :: the current package name
  - =ORCH_PACKAGE_VERSION= :: the current package version string
  - =ORCH_PACKAGE_URL= :: the URL for the source code
- - =ORCH_SOURCE_DIR= :: the full path to a directory in which the source may be unpacked
+ - =ORCH_SOURCE_DIR= :: the full path to a directory in which the source must be unpacked
  - =ORCH_UNPACKED_DIR= :: the full path to the unpacked source.
  - =ORCH_BUILD_DIR= :: the full path to a directory in which to build the source
  - =ORCH_INSTALL_DIR= :: the full path to the installation base directory
@@ -204,7 +214,9 @@ While not strictly part of the protocol, to be well behaved, the shim scripts sh
 
  - idempotent :: rerunning a shim script should not cause repetition of previous successfully applied actions
  - strict :: any error produced during any action by the shim script should cause a clear message to be printed and an immediate termination of the shim script in a way that communicates a non-zero return code to the calling environment
- - regular :: a high level of shim code reuse is expected as many packages share similar installation actions.  A collection of such are available as described in section [[sec:bash]].  Many shim scripts do not need to be written as some common steps are implemented directly in the orchestration application.
+ - regular :: a high level of shim code reuse should be maintained.
+
+When the shim script is implemented in =/bin/bash=, a collection of =bash= functions are provided in the executing environment.  They are defined in section [[sec:bash]].  Through the shim cascade mechanism described above, it is often possible to reuse existing shims.  This is particularly true for the =download= and =unpack= steps.
 
 
 * Orchestration Applications
@@ -217,25 +229,6 @@ The orchestration applications must adhere to the protocol as described above bu
  - Work out global installation order based on declared dependencies
  - Implement breadth-first or depth-first build
  - Perform actions for and report their results to the user in detail (to support detailed continuous integration)
-
-** Application states
-
- - start
- - parse suite configuration file
- - determine calling environment for each package
- - determine target package list
- - retrieve package shims
- - perform user command.
-
-*** Application Commands 
-
-The command line application is separated into several sub commands. 
-
- - check :: validate a suite configuration file
- - dump :: dump information about an installation without performing it
- - list :: list packages and their versions for a given suite
- - install :: perform an installation either by depth/breadth-first descent and potentially limited to stop at a particular stage
-
 
 
 * Orchestration =bash= Utility Functions

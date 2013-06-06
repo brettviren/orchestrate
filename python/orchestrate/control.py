@@ -27,6 +27,8 @@ def build_parser():
     # Global options
     parser.add_argument('-c', '--config', type=str, action='append',
                         help='Add a suite configuration file.')
+    parser.add_argument('-s', '--shims', type=str, action='append', default=list(),
+                        help='Set additional shim paths')
     parser.add_argument('-l', '--log', type=str, default='/dev/stdout',
                         help='Set a log file')
     parser.add_argument('suite', type=str, nargs='?',
@@ -42,9 +44,11 @@ def main(argv = None):
     parser = build_parser()
     opts = parser.parse_args(argv)
 
-    logging.basicConfig(filename=opts.log, level=logging.DEBUG)
+    logging.basicConfig(filename=opts.log, 
+                        level=logging.DEBUG,
+                        format='%(levelname)-7s %(asctime)-15s %(message)s (%(filename)s:%(lineno)d)')
 
-    orch = app.Orchestrate(opts.config, opts.suite)
+    orch = app.Orchestrate(opts.config, opts.suite, ':'.join(opts.shims))
 
     # Run the command.  The command class sets the run method.
     opts.run(orch)

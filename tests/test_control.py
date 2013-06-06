@@ -14,11 +14,13 @@ def test_list():
     '''
     control.main(['-c',os.path.join(testdir,'test.cfg'),'list'])
 
-def test_suite():
+def test_steps():
     '''
     Install a suite
     '''
+    print 'This currently fails as "step" command is not yet implemented:'
     control.main(['-c',os.path.join(testdir,'test.cfg'),'step',])
 
 if '__main__' == __name__:
     test_list()
+    test_steps()
