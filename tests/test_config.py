@@ -22,24 +22,6 @@ def test_package_sections():
         else:
             assert ret, 'No sections for package "%s"' % pkg
         continue
-        
-def test_version_consistent():
-    '''
-    Test version constraints.
-    '''
-    vc_to_check = [
-        ('1.0', 'version < 1.0', False),
-        ('1.0', 'version == 1.0', True),
-        ('1.0', 'version >= 1.0', True),
-        ('2.0', 'version != 1.0', True),
-        ]
-    for version, constraint, tf in vc_to_check:
-        result = suite.version_consistent(version, constraint)
-        if tf != result:
-            raise ValueError, 'Fail with: "%s" "%s" %s != %s' % \
-                (version, constraint, tf, result)
-        #print 'Success with: "%s" "%s" %s == %s' % \
-        #        (version, constraint, tf, result)
 
 def test_section_constraint():
     constraints = ['version < 1.0', '', ' ', 'version', '1.0']

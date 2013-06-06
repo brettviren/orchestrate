@@ -2,3 +2,7 @@
 *.pyc
 doc/orchestrate.pdf
 doc/orchestrate.tex
+MANIFEST
+dist/
+doc/orchestrate.html
+_cut.py

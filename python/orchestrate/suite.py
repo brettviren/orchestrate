@@ -8,7 +8,7 @@ import re
 
 from ConfigParser import SafeConfigParser # , NoOptionError
 
-from util import version_consistent
+from util import version_consistent, host_description
 
 def read_config(fname):
     cfg = SafeConfigParser()
@@ -97,16 +97,14 @@ def resolve(cfg, suitename = None):
     defaults_name = cfg.get(suite_section, 'defaults')
 
     # load up defaults for all packages
-    defaults = dict(cfg.items('defaults %s' % defaults_name))
+    defaults = host_description()
+    defaults.update(dict(cfg.items('defaults %s' % defaults_name)))
     defaults.setdefault('tags', tags)
     tags = map (lambda x: x.strip(), defaults.get('tags').split(','))
     defaults.setdefault('tagsdashed', '-'.join(tags))
     defaults.setdefault('tagscolon', ':'.join(tags))
     defaults.setdefault('suite', suitename)
-    uname_fields = ['kernelname', 'hostname', 
-                    'kernelversion', 'vendorstring', 'machine']
-    for k,v in zip(uname_fields, os.uname()):
-        defaults.setdefault(k,v)
+    
 
     pkgobjs = []
     for pkgname, pkgver in cfg.items('packagelist %s' % packagelist):
