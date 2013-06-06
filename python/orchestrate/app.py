@@ -41,12 +41,14 @@ def build_shim_path(cfg, extra=None):
     cfg.set('global','shim_path',shim_path)
     return shim_path
 
-def resolve_suite(cfg, suitename):
+def resolve_suite(cfg, suitename, packages = None, steps = None):
     'Return the list of shim objects for the given configuration and suite name'
     varlist = suite.resolve(cfg, suitename)
     shims = []
     for vars in varlist:
-        s = shim.ShimPackage(**vars)
+        if packages and not vars['package_name'] in packages:
+            continue
+        s = shim.ShimPackage(steps=steps, **vars)
         shims.append(s)
     return shims
 
@@ -55,15 +57,22 @@ class Orchestrate(object):
     Interface object to core functionality.
     '''
 
-    def __init__(self, config_files, suitename = None, shim_path = None):
+    def __init__(self, config_files, suitename = None, shim_path = None, 
+                 packages = None, steps = None):
         '''
         Create an Orchestrate object with one or more configuration
         files and possibly a suite name.
+        
+        Additional shim path segment can be set with <shim_path>.
+
+        If <packages> or <steps> are given any operations that iterate
+        over these are limited to the lists given.
         '''
+
         self.cfg = suite.read_config(config_files)
         shim_path = build_shim_path(self.cfg, shim_path)
         logging.info('Using shim path: %s' % shim_path)
-        self.shims = resolve_suite(self.cfg, suitename)
+        self.shims = resolve_suite(self.cfg, suitename, packages=packages, steps=steps)
         shim.check_deps(self.shims)
         return
     

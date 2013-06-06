@@ -112,3 +112,16 @@ def wash_env(d):
     for k,v in d.items():
         ret[k] = os.path.expanduser(os.path.expandvars(v))
     return ret
+
+def list_split(lst, delim = ','):
+    '''
+    Split individual strings in a list of strings by the delimiter
+    <delim> to produce a single flat list.
+    '''
+    if not lst:
+        return lst
+    ret = []
+    for x in lst:
+        ret += x.split(delim)
+    return ret
+

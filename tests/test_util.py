@@ -41,8 +41,16 @@ def test_share_directory():
     mydir = os.path.dirname(os.path.realpath(__file__))
     assert osd == mydir, 'Can not find self %s != %s' % (osd, mydir)
 
+def test_split_list():
+    got = ['foo','bar,baz','quaz']
+    want = ['foo','bar','baz','quaz']
+    from orchestrate.util import list_split
+    maybe = list_split(got)
+    assert maybe == want, 'Nope: %s' % str(maybe)
+
+
 if __name__ == '__main__':
     test_version_consistent()
     test_host_description()
     test_share_directory()
-
+    test_split_list()

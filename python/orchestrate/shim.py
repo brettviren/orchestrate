@@ -150,21 +150,29 @@ class ShimPackage(object):
     A shim package.
     '''
 
-    steps = ['download', 'unpack', 'prepare', 'build', 'install', 'validate']
+    # ordered steps
+    steps = ['download', 'unpack', 'prepare', 'build', 'install', 'postinst', 'validate']
 
+    # map a step to where it runs from by default
     rundirs = {
         'unpack':        'source_dir',
         'prepare':       'build_dir',
         'build':         'build_dir',
         'install':       'build_dir',
+        'postinst':      'install_dir',
         'validate':      'install_dir',
     }
 
+    # required variables
     required = ['package_name', 'package_version', 'package_url',
                 'source_dir', 'unpacked_dir', 'build_dir', 'install_dir',
                 'shim_path']
 
-    def __init__(self, **vars):
+    def __init__(self, steps = None, **vars):
+
+        print 'steps: %s' % str(steps)
+        if steps:
+            self.steps = steps
 
         missing = set(self.required).difference(vars.keys())
         if missing:

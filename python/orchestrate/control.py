@@ -8,9 +8,10 @@ import logging
 
 import commands, app
 
-# Note, the patterns used here and in commands.py are taken from the cobe IRC bot.
+from util import list_split
 
-
+# Note, the patterns governing how argparse subcommands are done here
+# and in commands.py are taken from the cobe IRC bot.
 def add_command(parsers, submodule):
     for name in dir(submodule):
         obj = getattr(submodule, name)
@@ -31,6 +32,10 @@ def build_parser():
                         help='Set additional shim paths')
     parser.add_argument('-l', '--log', type=str, default='/dev/stdout',
                         help='Set a log file')
+    parser.add_argument('-P', '--packages', type=str, action='append', 
+                        help='Limit actions to list of packages')
+    parser.add_argument('-S', '--steps', type=str, action='append', 
+                        help='Limit actions to list of steps')
     parser.add_argument('suite', type=str, nargs='?',
                         help='Name the target suite')
     # Sub commands
@@ -48,7 +53,8 @@ def main(argv = None):
                         level=logging.DEBUG,
                         format='%(levelname)-7s %(asctime)-15s %(message)s (%(filename)s:%(lineno)d)')
 
-    orch = app.Orchestrate(opts.config, opts.suite, ':'.join(opts.shims))
+    orch = app.Orchestrate(opts.config, opts.suite, ':'.join(opts.shims), 
+                           list_split(opts.packages), list_split(opts.steps))
 
     # Run the command.  The command class sets the run method.
     opts.run(orch)
