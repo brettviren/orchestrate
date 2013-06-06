@@ -47,3 +47,27 @@ class ListCommand(object):
                 print '\tdep: %s' % str(dep)
 
         return
+
+class CheckCommand(object):
+    '''
+    A command to check the configuration.
+    '''
+    @classmethod
+    def add_subparser(cls, parser):
+        subparser = parser.add_parser('check', help='Check the suite configuration file')
+        subparser.set_defaults(run = cls.run)
+        return
+
+    @staticmethod
+    def run(app):
+        '''
+        Run the command on the application
+        '''
+        for s in app.shims:
+            print '%s/%s:' % (s.vars['package_name'], s.vars['package_version'])
+            for k,v in sorted(s.vars.items()):
+                if k in ['package_name','package','package_version','version']:
+                    continue
+                print '\t%s = %s' % (k,v)
+        return
+

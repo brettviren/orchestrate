@@ -8,7 +8,7 @@ import re
 
 from ConfigParser import SafeConfigParser # , NoOptionError
 
-from util import version_consistent, host_description
+from util import version_consistent, host_description, interpolate_dict, wash_env
 
 def read_config(fname):
     cfg = SafeConfigParser()
@@ -23,7 +23,9 @@ def package_sections(sections, package):
     pat = r'package %s\b' % package
     ret = []
     for sec in sections:
-        if re.match(pat,sec):
+        #print pat,sec
+        m = re.match(pat,sec)
+        if m:
             #print 'Checking %s' % (sec,)
             ret.append(sec)
     return ret
@@ -49,29 +51,6 @@ def get_package_section(cfg, package, version):
         return dict(cfg.items(section))
     raise ValueError, 'No consistent package section for %s/%s found' % \
         (package, version)
-
-def interpolate_dict(d):
-    '''Take a dict of string values and call .format() on each value
-    using the dict itself until all "{...}" variables are
-    interpolated.
-    '''
-    depth = 10
-    last_d = dict(d)
-    #print last_d
-    while depth:
-        depth -= 1
-        new_d = {}
-        for k,v in last_d.items():
-            try:
-                new_v = v.format(**last_d)
-            except ValueError:
-                print 'Attempted interpolation on: "%s"' % v
-                raise
-            new_d[k] = new_v
-        if new_d == last_d:         # converged
-            return new_d
-        last_d = new_d
-    raise ValueError, 'Exceeded maximum interpolation recursion'
 
 
 def resolve(cfg, suitename = None):
@@ -116,7 +95,12 @@ def resolve(cfg, suitename = None):
         d.setdefault('package_version', pkgver)
         d.setdefault('package', pkgname)
         d.setdefault('version', pkgver)
+        d.setdefault('version_underscore', pkgver.replace('.','_'))
+        d.setdefault('version_nodots', pkgver.replace('.',''))
+        d.setdefault('version_2digit', '.'.join(pkgver.split('.')[:2]))
         d.update(pkg_sec)
         pkgobjs.append(d)
 
-    return map(interpolate_dict, pkgobjs)
+    ret = map(interpolate_dict, pkgobjs)
+    return map(wash_env, ret)
+        

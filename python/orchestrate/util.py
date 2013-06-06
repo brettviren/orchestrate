@@ -4,6 +4,22 @@ import os
 
 from subprocess import check_output, CalledProcessError
 
+def orch_share_directory(subdir = '.'):
+    'Find <subdir> in installed app area'
+    venvdir = os.environ.get('VIRTUAL_ENV')
+    if venvdir:                 # installed in virtual env
+        maybe = os.path.realpath(os.path.join(venvdir, 'share/orchestrate', subdir))
+        if os.path.exists(maybe):
+            return maybe
+
+    # in-source
+    maybe = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))),subdir)
+    maybe = os.path.realpath(maybe)
+    if os.path.exists(maybe):
+        return maybe
+
+    return None
+
 def version_consistent(version, constraint):
     '''
     Return true if the constraint string is consistent with the version string.
@@ -42,14 +58,57 @@ def host_description():
                     'kernelversion', 'vendorstring', 'machine']
     uname = os.uname()
     for k,v in zip(uname_fields, uname):
-        ret.setdefault(k,v)
+        ret[k] = v
     platform = '{kernelname}-{machine}'.format(**ret)
-    ret.setdefault('platform',platform)
+    ret['platform'] = platform
     
     try:
-        upsflavor = check_output(['ups','flavor'])
+        flavor = check_output(['ups','flavor'])
     except OSError:
-        upsflavor = ups_flavor()
+        flavor = ups_flavor()
+    ret['ups_flavor'] = flavor
 
-    ret.setdefault('upsflavor',upsflavor)
+    ret['orch_dir'] = orch_share_directory()
+    return ret
+
+
+def interpolate_dict(d):
+    '''Take a dict of string values and call .format() on each value
+    using the dict itself until all "{...}" variables are
+    interpolated.
+    '''
+    depth = 10
+    last_d = dict(d)
+    #print last_d
+
+    def dump_last():
+        p = last_d.get('package_name','(unknown package)')
+        v = last_d.get('package_version','(unknown version)')
+        return '%s/%s' % (p,v)
+    while depth:
+        depth -= 1
+        new_d = {}
+        for k,v in last_d.items():
+            try:
+                new_v = v.format(**last_d)
+            except ValueError, err:
+                print 'Attempted interpolation on: %s = "%s" in %s' % (k,v, dump_last())
+                raise
+            except KeyError, err:
+                print 'Attempted interpolation on: %s = "%s" in %s' % (k,v, dump_last())
+                raise
+            new_d[k] = new_v
+        if new_d == last_d:         # converged
+            return new_d
+        last_d = new_d
+    raise ValueError, 'Exceeded maximum interpolation recursion'
+
+def wash_env(d):
+    '''
+    Return a new dictionary based on input which has all values run
+    through os.path.expandvars() and os.path.expanduser()
+    '''
+    ret = {}
+    for k,v in d.items():
+        ret[k] = os.path.expanduser(os.path.expandvars(v))
     return ret

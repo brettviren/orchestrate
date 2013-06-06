@@ -9,24 +9,9 @@ import os
 import proc
 import tempfile
 import logging
-from util import version_consistent
+from util import version_consistent, orch_share_directory
 shell = '/bin/bash'
 
-
-def orch_share_directory(subdir):
-    'Find <subdir> in installed app area'
-    venvdir = os.environ.get('VIRTUAL_ENV')
-    if venvdir:                 # installed in virtual env
-        maybe = os.path.join(venvdir, 'share/orchestrate', subdir)
-        if os.path.exists(maybe):
-            return maybe
-
-    # in-source
-    maybe = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))),subdir)
-    if os.path.exists(maybe):
-        return maybe
-
-    return None
 
 def package_shim_directories(pathlist, named, env = None):
     '''
