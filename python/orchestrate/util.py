@@ -125,3 +125,30 @@ def list_split(lst, delim = ','):
         ret += x.split(delim)
     return ret
 
+
+def order_depends(lst):
+    '''
+    Return a new version of the given list <lst> such that no element
+    comes before any no which it depends.  Each element should have a
+    .name property giving its name an a .depends property giving a
+    list of names of other elements on which it depends, if any
+    '''
+    n2e = {e.name:e for e in lst}
+    ordered = []
+    def satisfied(ele):
+        deps = element.depends
+        if not deps: return True
+        for dep in deps:
+            if not dep in ordered:
+                return False
+        return True
+    while lst:
+        left = []
+        for element in lst:
+            if satisfied(element):
+                ordered.append(element.name)
+                #print ordered, [x.name for x in left]
+                continue
+            left.append(element)
+        lst = left
+    return [n2e[x] for x in ordered]

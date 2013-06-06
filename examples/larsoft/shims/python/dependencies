@@ -1,0 +1,4 @@
+#!/bin/bash
+echo gcc >> $1
+echo sqlite >> $1
+

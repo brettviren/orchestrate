@@ -1,0 +1,4 @@
+#!/bin/bash
+echo cmake >> $1
+echo gccxml >> $1
+echo python >> $1

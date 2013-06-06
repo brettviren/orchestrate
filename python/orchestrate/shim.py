@@ -90,6 +90,7 @@ def package_shim_dependencies(script, env):
         line = line.split(' ',1)
         ret.append((line[0], line[1:]))
     os.remove(fn)
+    logging.debug('dependencies for package %s: %s from %s' % (pv, str(ret), script))
     return ret
 
 def package_shim_environment(filename, pathlist, env):
@@ -144,6 +145,12 @@ def check_deps(shimlist):
         continue
     return
 
+
+def order_deps(shimlist):
+    '''
+    Return a new shimlist which is ordered so that no shim comes before any that it depends on.
+    '''
+    
 
 class ShimPackage(object):
     '''
@@ -232,6 +239,10 @@ class ShimPackage(object):
     def version(self):
         'Get the version string of the package this shims'
         return self.vars['package_version']
+    @property
+    def depends(self):
+        'Return list of names of shims on which this one depends'
+        return map(lambda x: x[0], self.dep_ver)
 
     def get_gen_dir(self):
         odir = os.path.join(self.vars['build_dir'],'orch')

@@ -7,6 +7,7 @@ import os
 import suite
 import shim
 import logging
+from util import order_depends
 from ConfigParser import NoOptionError
 
 def build_shim_path(cfg, extra=None):
@@ -74,6 +75,7 @@ class Orchestrate(object):
         logging.info('Using shim path: %s' % shim_path)
         self.shims = resolve_suite(self.cfg, suitename, packages=packages, steps=steps)
         shim.check_deps(self.shims)
+        self.shims = order_depends(self.shims)
         return
     
 

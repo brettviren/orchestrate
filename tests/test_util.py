@@ -49,8 +49,26 @@ def test_split_list():
     assert maybe == want, 'Nope: %s' % str(maybe)
 
 
+def test_order_depends():
+    from orchestrate.util import order_depends
+    from collections import namedtuple
+
+    ND = namedtuple('ND', 'name depends')
+
+    a = ND('a',[])
+    b = ND('b',['a'])
+    c = ND('c',['a'])
+    d = ND('d',['a','c'])
+    e = ND('e',['c','d'])
+    lst = [e,d,c,b,a]
+    want = ', '.join([x.name for x in [a,c,b,d,e]]) # c and b tie so retain input ordering
+    olst = order_depends(lst)
+    got = ', '.join([x.name for x in olst])
+    assert got == want, 'bad order, got: %s, want: %s' % (got, want)
+
 if __name__ == '__main__':
     test_version_consistent()
     test_host_description()
     test_share_directory()
     test_split_list()
+    test_order_depends()
