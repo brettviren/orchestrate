@@ -42,13 +42,12 @@ def test_get_package_section():
 def test_resolve():
     cfg = suite.resolve(testcfg)
     for o in cfg:
-        assert 'shim_dir' in o.keys()
+        assert 'shim_path' in o.keys()
         print '\n'.join(['%s: %s' %(k,v) for k,v in o.items()])
         print 
 
 if '__main__' == __name__:
     test_package_sections()
-    test_version_consistent()
     test_section_constraint()
     test_get_package_section()
     test_resolve()

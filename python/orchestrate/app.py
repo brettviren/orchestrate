@@ -23,7 +23,7 @@ def build_shim_path(cfg, extra=None):
     except NoOptionError:
         pass
     osp = shim.orch_share_directory('shims')
-    shim_path = ':'.join(filter(None, [extra, esp,csp,osp]))
+    shim_path = ':'.join(filter(None, [extra, esp, csp, osp]))
     if not shim_path:
         raise ValueError, 'no shim path could be built'
 
@@ -42,40 +42,58 @@ def build_shim_path(cfg, extra=None):
     cfg.set('global','shim_path',shim_path)
     return shim_path
 
-def resolve_suite(cfg, suitename, packages = None, steps = None):
-    'Return the list of shim objects for the given configuration and suite name'
-    varlist = suite.resolve(cfg, suitename)
-    shims = []
-    for vars in varlist:
-        if packages and not vars['package_name'] in packages:
-            continue
-        s = shim.ShimPackage(steps=steps, **vars)
-        shims.append(s)
-    return shims
-
 class Orchestrate(object):
     '''
     Interface object to core functionality.
     '''
 
     def __init__(self, config_files, suitename = None, shim_path = None, 
-                 packages = None, steps = None):
+                 packages=None, steps=None):
         '''
         Create an Orchestrate object with one or more configuration
         files and possibly a suite name.
         
         Additional shim path segment can be set with <shim_path>.
 
-        If <packages> or <steps> are given any operations that iterate
-        over these are limited to the lists given.
+        The list of packages and/or shims can be specified.  If None
+        they will be set to the application defaults.
         '''
 
         self.cfg = suite.read_config(config_files)
-        shim_path = build_shim_path(self.cfg, shim_path)
-        logging.info('Using shim path: %s' % shim_path)
-        self.shims = resolve_suite(self.cfg, suitename, packages=packages, steps=steps)
+        self.varlist = suite.resolve(self.cfg, suitename)
+        self.shim_path = build_shim_path(self.cfg, shim_path)
+        logging.info('Using shim path: %s' % self.shim_path)
+
+        self.packages = packages or filter(None, [x.get('package_name') for x in self.varlist])
+        self.steps = steps or shim.ShimPackage.steps
+        self.shims = []
+        return
+
+    def set_shims(self, packages = None, steps = None):
+        '''
+        Set the shims for the given packages/steps.  If left
+        unspecified, the ones determined at construction time will be
+        used.
+        '''
+        if packages:
+            self.packages = packages
+        if steps:
+            self.steps = steps
+            
+        self.shims = []
+        for vars in self.varlist:
+            if not vars['package_name'] in self.packages:
+                continue
+            #print '\n'.join(['%s:%s'%kv for kv in vars.items()])
+            s = shim.ShimPackage(steps=self.steps, **vars)
+            self.shims.append(s)
+
+        logging.debug('Initial set of shims: %s' % ', '.join([x.name for x in self.shims]))
         shim.check_deps(self.shims)
         self.shims = order_depends(self.shims)
+        logging.info('steps: %s' % ', '.join(self.steps))
+        logging.info('packages: %s' % ', '.join(self.packages))
         return
+
     
 

@@ -34,16 +34,29 @@ def build_parser():
                         help='Set a log file')
     parser.add_argument('-P', '--packages', type=str, action='append', 
                         help='Limit actions to list of packages')
+    parser.add_argument('--last-package', type=str, default=None,
+                        help='Stop after acting on given package')
     parser.add_argument('-S', '--steps', type=str, action='append', 
                         help='Limit actions to list of steps')
+    parser.add_argument('--last-step', type=str, default=None,
+                        help='Stop after performing given step')
+    parser.add_argument('--top-loop', choices=['step','steps','package','packages'],
+                        default = 'packages',
+                        help = 'Top loop on steps or packages')
     parser.add_argument('suite', type=str, nargs='?',
                         help='Name the target suite')
+
     # Sub commands
     cmd_parsers = parser.add_subparsers()
     add_command(cmd_parsers, commands)
 
     return parser
 
+
+def truncate_list(lst, stop_at):
+    if not stop_at:
+        return lst
+    return lst[:lst.index(stop_at)+1]
 
 def main(argv = None):
     parser = build_parser()
@@ -55,6 +68,9 @@ def main(argv = None):
 
     orch = app.Orchestrate(opts.config, opts.suite, ':'.join(opts.shims), 
                            list_split(opts.packages), list_split(opts.steps))
+    steps = truncate_list(orch.steps, opts.last_step)
+    packages = truncate_list(orch.packages, opts.last_package)
+    orch.set_shims(packages, steps)
 
     # Run the command.  The command class sets the run method.
     opts.run(orch)

@@ -15,7 +15,7 @@ def get_shim_path():
     path = os.environ.get('ORCH_SHIM_PATH')
     if path:
         shim_path.append(path)
-    shim_path.append(os.path.abspath('./shims/hello'))
+    shim_path.append(os.path.abspath('./tests/shims'))
     path = shim.orch_share_directory('shims')
     if path:
         shim_path.append(path)
@@ -49,6 +49,7 @@ def test_hello():
     print 'deps:', s.dep_ver
 
     for step in s.steps:
+        print 'Running shim step: %s' % step
         s.run(step)
 
 if '__main__' == __name__:

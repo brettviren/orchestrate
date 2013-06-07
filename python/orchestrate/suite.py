@@ -63,10 +63,10 @@ def resolve(cfg, suitename = None):
     package, with all values fully interpolated.
     '''
 
-    globals = dict(cfg.items('global'))
+    glb = dict(cfg.items('global'))
 
     if not suitename:
-        suitename = globals['suite']
+        suitename = glb['suite']
     if not suitename:
         raise ValueError, 'no suite name given'
 
@@ -84,12 +84,11 @@ def resolve(cfg, suitename = None):
     defaults.setdefault('tagscolon', ':'.join(tags))
     defaults.setdefault('suite', suitename)
     
-
     pkgobjs = []
     for pkgname, pkgver in cfg.items('packagelist %s' % packagelist):
         #print pkgname, pkgver
         pkg_sec = get_package_section(cfg, pkgname, pkgver)
-        d = dict(globals)
+        d = dict(glb)
         d.update(defaults)
         d.setdefault('package_name', pkgname)
         d.setdefault('package_version', pkgver)
@@ -101,6 +100,8 @@ def resolve(cfg, suitename = None):
         d.update(pkg_sec)
         pkgobjs.append(d)
 
+
+
     ret = map(interpolate_dict, pkgobjs)
-    return map(wash_env, ret)
-        
+    ret = map(wash_env, ret)
+    return ret

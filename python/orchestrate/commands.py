@@ -71,3 +71,26 @@ class CheckCommand(object):
                 print '\t%s = %s' % (k,v)
         return
 
+
+class CheckCommand(object):
+    '''
+    A command to run through the steps
+    '''
+    @classmethod
+    def add_subparser(cls, parser):
+        subparser = parser.add_parser('step', help='Run through the installation steps')
+        subparser.set_defaults(run = cls.run)
+        return
+
+    @staticmethod
+    def run(app):
+        '''
+        Run the command on the application
+        '''
+        for s in app.shims:
+            print '%s/%s:' % (s.vars['package_name'], s.vars['package_version'])
+            for k,v in sorted(s.vars.items()):
+                if k in ['package_name','package','package_version','version']:
+                    continue
+                print '\t%s = %s' % (k,v)
+        return

@@ -139,7 +139,7 @@ def check_deps(shimlist):
         for dname, dconstraint in s.dep_ver:
             dshims = shims_in(shimlist, dname, dconstraint)
             if not dshims:
-                msg = 'check dependency failed: no package "%s" to satisfy "%s" (constraint="%s") from dependencies file: %s' % (dname, s.name, dconstraint, s.shim_scripts.get('dependencies', '(none)'))
+                msg = 'check dependency failed: no package shim for "%s" needed to satisfy "%s" (constraint="%s") from dependencies file: %s' % (dname, s.name, dconstraint, s.shim_scripts.get('dependencies', '(none)'))
                 raise ValueError, msg
             continue
         continue
@@ -185,6 +185,8 @@ class ShimPackage(object):
         if missing:
             raise ValueError, 'Shim missing variables: %s' % (', '.join(missing),)
 
+        pname = vars['package_name']
+
         # find packages - calls the "version" shim scripts
         self.vars = vars
         env = {'ORCH_%s'%k.upper():v for k,v in vars.items()}
@@ -197,7 +199,8 @@ class ShimPackage(object):
                 if maybe not in shim_names:
                     shim_names.append(maybe)
 
-        logging.debug('Trying shim names: %s' % ', '.join(shim_names))
+        logging.debug('Trying shim names for package "%s": %s' % \
+                          (pname, ', '.join(shim_names)))
         psd = package_shim_directories(vars['shim_path'].split(':'), 
                                        shim_names, env)
         logging.debug('Using shim directories: %s' % ', '.join(psd))
@@ -284,8 +287,12 @@ class ShimPackage(object):
 
     def run(self, step):
         runner = self.get_runner(step)
+        if not runner:
+            logging.info('No shim script for step "%s" of package "%s"' % \
+                             (step, self.vars['package_name']))
+            return
         cmdstr = '%s %s' % (shell, runner)
-        print 'Executing %s' % cmdstr
+        print 'Executing shim script %s' % cmdstr
 
         rc = proc.run(cmdstr)
         if rc != 0:

@@ -33,6 +33,7 @@ def test_shim_path():
     sp = orch.cfg.get('global','shim_path')
     assert good_shims in sp, 'No %s in %s' % (good_shims,sp)
     assert bad_shims not in sp, 'Bad shim %s in %s' % (bad_shims,sp)
+    assert '{' not in sp and '}' not in sp, 'Found curlies in shim_path: %s' % sp
 
 def test_bad_shim():
     sp = os.path.join(testdir, 'shims-bad')
