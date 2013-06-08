@@ -32,6 +32,7 @@ def run(cmdstr, env=None, logout=logout, logerr=logerr):
     if logerr:
         stderr = PIPE
 
+    logging.debug('proc running: "%s"' % cmdstr)
     p = Popen(cmdstr.split(), stdout=stdout, stderr=stderr, 
               universal_newlines=True,env=env)
 

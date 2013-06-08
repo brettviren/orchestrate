@@ -321,6 +321,7 @@ class ShimPackage(object):
             fp.write('source %s\n' % dep[0])
         fp.write('source %s\n' % self.orch_env_file)
         if rundir:
+            fp.write('assuredir %s\n' % rundir)
             fp.write('goto %s\n' % rundir)
         fp.write('''if head -1 {script} | grep -q /bin/bash ; then 
     source {script} {argstr}

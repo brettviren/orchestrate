@@ -3,10 +3,11 @@
 A main interface to the application
 '''
 
+import sys
 import argparse
 import logging
 
-import commands, app
+import commands, app, cmdline
 
 from util import list_split
 
@@ -58,7 +59,27 @@ def truncate_list(lst, stop_at):
         return lst
     return lst[:lst.index(stop_at)+1]
 
-def main(argv = None):
+orch_utils = filter(lambda x: x.startswith('cmdline_'), dir(cmdline))
+
+def util_main(argv = None):
+    '''This main interface provides some utilities to make writing shim
+    scripts easier.  It's called strictly like:
+
+    <prog> <command> <command args>
+
+    Where <command> is from a fixed list.
+    '''
+    cmdname = argv[1]
+    cmd = cmdline.__dict__['cmd_'+cmdname]
+    ret = cmd(*argv[2:])
+    print ret
+    return ret
+
+def app_main(argv = None):
+    '''
+    The main interface provides access to the orchestrate application.
+    '''
+
     parser = build_parser()
     opts = parser.parse_args(argv)
 
@@ -77,6 +98,14 @@ def main(argv = None):
     opts.run(orch)
 
     return
+
+def main(argv = None):
+    if not argv:
+        argv = sys.argv
+    if len(argv) > 1:
+        if argv[1] in orch_utils:
+            return util_main(argv)
+    app_main(argv)
 
 if '__main__' == __name__:
     main()

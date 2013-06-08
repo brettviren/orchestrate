@@ -4,7 +4,7 @@ Test the orchestrate.control module
 '''
 
 import os
-from orchestrate import control
+from orchestrate import control, shim
 
 testdir = os.path.dirname(__file__)
 testcfgfile = os.path.join(testdir,'test.cfg')
@@ -15,22 +15,29 @@ def test_list():
     '''
     Test the list command
     '''
-    control.main(['-c',os.path.join(testdir,'test.cfg'),'list'])
+    cmd = cmdstr + ' list'
+    print 'testing with command: %s' % cmd
+    control.main(cmd.split())
 
 def test_steps():
     '''
     Install a suite
     '''
-    print 'This currently fails as "step" command is not yet implemented:'
-    control.main(['-c',os.path.join(testdir,'test.cfg'),'step',])
-
-def test_limit():
-    cmd = cmdstr + ' --steps download,unpack --packages bc list'
-    print 'Test limit with "%s"' % cmd
+    cmd = cmdstr + ' step'
+    print 'testing with command: %s' % cmd
     control.main(cmd.split())
+
+def test_bc():
+    '''
+    Install one package from a suite, one step at a time.
+    '''
+    for step in shim.ShimPackage.steps:
+        cmd = cmdstr + ' --last-step %s --packages bc step' % step
+        print 'Test limit with "%s"' % cmd
+        control.main(cmd.split())
 
 
 if '__main__' == __name__:
-    test_list()
+    #test_list()
     test_steps()
-    test_limit()
+    test_bc()

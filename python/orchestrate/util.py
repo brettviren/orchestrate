@@ -152,3 +152,13 @@ def order_depends(lst):
             left.append(element)
         lst = left
     return [n2e[x] for x in ordered]
+
+def assuredir(directory):
+    '''
+    Assure that the directory exists.  Return False if already exists, True o.w.
+    '''
+    if os.path.exists(directory):
+        return False
+    os.makedirs(directory)
+    return True
+

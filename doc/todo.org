@@ -1,0 +1,38 @@
+* Web cache
+
+A cascade of locations for package sources need to be supported.  For tarballs this means checking zero or more directory locations followed by zero or more URLs.  Similar for sources in a VCS.
+
+* VCS support
+
+The idea here is to specify a non "web" URL that describes a source package in a VCS.  It uses a generalized URL to encode enough info about how to produce an unpacked source.
+
+#+BEGIN_EXAMPLE
+<scheme>://<scheme-specific-domain>/<path>/[?key1=val1[&key2=val2]]
+#+END_EXAMPLE
+
+For example to specify a tagged commit in a git repository where the top of the source is not the top of the repository:
+
+#+BEGIN_EXAMPLE
+git://git@github.com:brettviren/orchestrate.git?path=to/source/top&tag=vX.Y.Z
+#+END_EXAMPLE
+
+An extension of the native scheme is to prepend a type.  For example, using SSH access with git normally just needs a scheme of =ssh= but to hint that git-over-ssh is needed one would have.
+
+#+BEGIN_EXAMPLE
+git+ssh://<domain>/<path>/...
+#+END_EXAMPLE
+
+Or, svn-over-http:
+
+#+BEGIN_EXAMPLE
+svn+http://<domain>/<path>/...
+#+END_EXAMPLE
+
+* UPS support
+
+For LBNE the final user environment needs to be set up via UPS to play nice with the rest of the FNAL-centric landscape.  For this a =postinst= step has been added as has an attempt to produce a UPS compatible =ups_flavor= variable.  Using =ups_flavor= and =version_underscore= variables in the layout will allow orch to "accidentally" produce an installation that  matches UPS expectations.  Then, implement this =postinst= script to do a =ups declare= on the just-installed package.  Badda-bing, badda-boom.
+
+* Downloaded shims
+
+Currently, the shim cascade mechanism only works via per-existing directories.  This means that for any suite to build it must have associated shims either as part of orchestrate or put in place by some other means.  In order to maximize automation it is desirable to specify a =shim_url= package variable (see [[VCS support]] above) that points to a package shim.  orch would then download this to some location that will be found first in the =shim_path=.  What a great world this will be.
+

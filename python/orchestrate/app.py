@@ -106,11 +106,11 @@ class Orchestrate(object):
             self.shims.append(s)
             self.package_shim[pname] = s
 
-        logging.debug('Initial set of shims: %s' % ', '.join([x.name for x in self.shims]))
         shim.check_deps(self.shims)
         self.shims = order_depends(self.shims)
-        logging.info('steps: %s' % ', '.join(self.steps))
-        logging.info('packages: %s' % ', '.join(self.packages))
+        self.packages = [x.name for x in self.shims] # pick up correct ordering
+        logging.info('Steps: %s' % ', '.join(self.steps))
+        logging.info('Packages: %s' % ', '.join(self.packages))
         return
 
 
