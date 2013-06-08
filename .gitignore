@@ -6,3 +6,4 @@ MANIFEST
 dist/
 doc/orchestrate.html
 _cut.py
+_cut.*
