@@ -60,7 +60,10 @@ append () {
 ## Download a file from a <URL> (default is package_url) to an optionally specified <targetdir> (default is source_dir)
 ## orch_download [<URL>] [<targetdir>]
 ## 
-
+## This downloads via "wget" or "curl".
+##
+## Note: explicit "download" shim scripts are normally not required.
+## The builtin can handle more types of downloads than this function.
 orch_download () {
     local url=$1 ; shift
     local targetdir=$1 ; shift
@@ -87,7 +90,23 @@ orch_download () {
 	fi
     fi
 
-    runcmd orch download "$url" "$target"
+    local cmd
+
+    # try wget
+    cmd=$(type -P -f wget)
+    if [ -n "$cmd" ] ; then
+	runcmd "$cmd --quiet -nv --no-check-certificate -O $target $url"
+	return $?
+    fi
+
+    # try curl
+    cmd=$(type -P -f curl)
+    if [ -n "$cmd" ] ; then
+	runcmd $cmd -o $target $url
+	return $?
+    fi
+
+    fail "No downloader found"
 }
 
 ## unpack <archive> to <where> creating <creates>

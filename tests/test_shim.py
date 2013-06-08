@@ -21,7 +21,19 @@ def get_shim_path():
         shim_path.append(path)
     return ':'.join(shim_path)
     
-
+def hello_vars():
+    hello_version = '2.8'
+    hello_pkg_name = 'hello-%s' % hello_version,
+    return dict(shim_path = get_shim_path(),
+                unpacked_dir = '/tmp/test_shim/source/%s'%hello_pkg_name,
+                install_dir = '/tmp/test_shim/install',
+                build_dir = '/tmp/test_shim/build',
+                source_dir = '/tmp/test_shim/source',
+                download_dir = '/tmp/test_shim/downloads',
+                package_name = 'hello',
+                package_version = '2.8',
+                package_url = 'http://ftp.gnu.org/gnu/hello/%s.tar.gz'%hello_pkg_name,
+            )
 def test_shim_path():
     sp = get_shim_path()
     assert isinstance(sp, basestring), 'Got weird type for shim path (%s) %s' % (type(sp), sp)
@@ -35,22 +47,17 @@ def test_psd():
     assert psd, 'Got no psd for bc from %s' % pathlist
     print 'psd=%s' % ', '.join(psd)
 
+def test_builtin():
+    vars = hello_vars()
+    s = shim.ShimPackage(**vars)
+    print 'Running run("bogus")'
+    s.run('bogus')
+    print 'Running run_bogus()'
+    s.run_bogus()
+
 def test_hello():
 
-    hello_version = '2.8'
-    hello_pkg_name = 'hello-%s' % hello_version,
-
-    vars = dict(shim_path = get_shim_path(),
-                unpacked_dir = '/tmp/test_shim/source/%s'%hello_pkg_name,
-                install_dir = '/tmp/test_shim/install',
-                build_dir = '/tmp/test_shim/build',
-                source_dir = '/tmp/test_shim/source',
-                package_name = 'hello',
-                package_version = '2.8',
-                package_url = 'http://ftp.gnu.org/gnu/hello/%s.tar.gz'%hello_pkg_name,
-    )
-
-
+    vars = hello_vars()
     s = shim.ShimPackage(**vars)
 
     print 'orch env file:', s.orch_env_file
@@ -62,6 +69,7 @@ def test_hello():
         s.run(step)
 
 if '__main__' == __name__:
-    #test_shim_path()
+    test_shim_path()
     test_psd()
-    #test_hello()
+    test_builtin()
+    test_hello()

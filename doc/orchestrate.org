@@ -37,9 +37,11 @@ The orchestration requires the participant components to honor a contract.  This
 
 A suite is a collection of packages of specific versions built with a consistent set of build options (aka qualifiers) referred to as "tags", installed in a common area following a layout pattern, for the same platform and intended to be used together in concert.  Different suites may have overlap.  
 
-Suites are fully specified in a configuration file.  This file provides an expressive and flexible format that can succinctly describe multiple suites of multiple versions and platform flavors or build qualifiers.  Providing the user with this configuration file, the orchestration application and the name of a desired suite is enough for them to produce an installation.  The application, with the help of the shim scripts, will handle locating installation directories, retrieving source code and building, installing and validating the packages as well as managing the user environment.
+Suites are fully specified in a configuration file.  This file provides an expressive and flexible format that can succinctly describe multiple suites of multiple versions and platform flavors or build qualifiers.  If an installation expert provides a user with a configuration file, the orchestration application and the name of a desired suite then the user should have enough to automatically produce an installation.  The application, with the help of the shim scripts, will handle locating installation directories, retrieving source code and building, installing and validating the packages as well as managing the user environment.
 
-The syntax of the configuration file follows a format sometimes called "INI".  It consists of a number of titled sections which contain key/value pairs.  Section titles are written in the form =[<type> <name>]= except for one special =[global]= section.  A section =<type>= is a single word and the =<name>= may consist of one or more words.  The payload of each section is a collection of key/value pairs, one per line.  
+*** Configuration sections
+
+The syntax of the configuration file follows a format sometimes called "INI".  It consists of a number of titled sections which contain key/value pairs.  Section titles are written in the form =[<type> <name>]= except for one special =[global]= section.  A section's =<type>= is a single word and the =<name>= may consist of one or more words.  The payload of each section is a collection of key/value pairs, one per line.  
 Keys and values are separated either by a "=:=" or a "===".  Comments begin with "=#=".
 
 The following sections are expected:
@@ -50,24 +52,78 @@ The following sections are expected:
  - =defaults= :: provide a collection of default variable definitions, referred to by the suite's =defaults= key
  - =package= :: a per-package optional section for overriding specific variable definitions.  The name of the package section includes a package name and an optional version constraint.
 
-Values in the suite file are strings.  They can be composed from the value of variables by surrounding the variable name with "={}=".   Any key from a section used in the configuration may be used as a variable (recursive loops must be avoided).   Any sections not referenced starting with the selected =suite= are ignored. Variables defined in the =defaults= section can be overridden on a per-package basis by any defined in a =package= section.
+*** Configuration Variables
 
-Additional variables defined by the orchestration application may also be used.  They include:
+Values in the suite configuration file are interpreted as strings.  They can be composed from the value of other variables by surrounding their names each with pairs of curly braces "={}=".   Any key from a section used in the configuration may be used as a variable (recursive loops must be avoided).   Any sections not referenced starting with the selected =suite= are ignored. Variables defined in the =defaults= section can be overridden on a per-package basis by any defined in a =package= section.  
+
+This means each package receives a somewhat different set of variables and values which has been tailored to the package.
+The set of package variables are communicated to the shim scripts through environment variables formed by up-casing the configuration variable names and prepending an =ORCH_= string to their name.  Shim scripts should honor the value and intent of these variables.  Author of shim script may add additional variables to the corresponding section in the configuration file as required.
+
+Variables which are defined by the orchestration application include:
 
  - =suite= :: the suite name
  - =package= :: the name of the current package
  - =version= :: the version string of the current package
- - =upsflavor= :: the UPS flavor string for the build host
+ - =version_underscore= :: as above but with dots replaced with underscores
+ - =ups_flavor= :: the UPS flavor string for the build host
  - =tagsdash= :: the list of tags joined by a dash 
  - =tagscolon= :: the list of tags joined by a colon
-
-Each package gets its own copy of the variables independently interpolated.  These variables are communicated to the shim scripts through the executing environment.  Their names are up-cased and have =ORCH_= prepended.  There is a set of required variables, listed below.  If they are not provided the application will abort.  Additional variables needed for specific package shims may also be defined.
 
 There are also variables that the orchestration application directly interprets:
 
  - =shim_path= :: used to locate package shim scripts (more below)
 
-A partial example suite configuration file is provided in [[../tests/test.cfg][tests/test.cfg]].
+The naming conventions for variables are:
+
+ - =*_dir= :: holds the name of an absolute directory
+ - =*_reldir= :: holds a single, relative directory 
+
+Standard variables which describe package layout.  
+
+ - =unique_reldir= :: not strictly needed but useful for defining a package/version specific sub directory
+ - =base_dir= :: not strictly needed but can be used to define a root directory into which all other directories are based
+ - =download_dir= :: directory containing source packages (archive files or repository checkouts)
+ - =source_dir= :: a base directory into which read-to-use source is placed, usually made at least package and version specific
+ - =unpacked_dir= :: the directory, usually under =source_dir= which contains the unpacked source
+ - =build_dir= :: a base directory where the package may be built
+ - =install_dir= :: the base ("prefix") directory where the final installation is placed
+
+To locate a source package one defaine
+
+ - =package_url= :: a web or CVS URL
+
+By default, package shims having the same name as the package itself are searched.  This behavior can be changed by setting
+
+ - =shim_name= :: explicitly name the package shim
+ - =shim_fallback= :: a comma-separate list of one or more package shim names
+
+In this manner one can create a cascade of sources of shim scripts.  A =default= package shim is provided by the application.
+
+It is useful to exploit reoccurring patterns in the suite installation.  For example, a vast majority of package source archive files follow a pattern in their name and extension and in the directory produced when they are unpacked.  One can reflect this pattern in the configuration file by, for example, defining:
+
+ - =unpacked_reldir= :: defined as ={package}-{version}=
+ - =tarball_ext= :: defined as =tar.gz=
+ - =tarball= :: defined as ={unpacked_reldir}.{tarball_ext}=
+
+Then, any packages which deviate from this common pattern can override one or more of these variables, as required, in their =[package]= section.
+
+#+BEGIN_EXAMPLE
+[package deviant]
+tarball_ext = tgz
+package_url = http://deviant.example.com/source/{tarball}
+#+END_EXAMPLE
+
+This change will work its way up to the =tarball= definition and back down to the =package_url= one.  Notice that this package configuration section is completely independent of detail of the package.  If its version must change this is done in the =packagelist= only.  
+
+On the other hand, if the upstream developers are particularly evil they will change the location of their source package on you.  For example, say that as of version 2 they put all version 1 code into a different location on their server.  This can be handled by adding a new, addition package section :
+
+#+BEGIN_EXAMPLE
+[package deviant version < 2]
+tarball_ext = tgz
+package_url = http://deviant.example.com/obsolete/source/{tarball}
+#+END_EXAMPLE
+
+An example suite configuration file used by the tests is provided in [[../tests/test.cfg][tests/test.cfg]] additional ones are under the [[../examples/][examples]] directory.
 
 ** Package Shim Scripts
 

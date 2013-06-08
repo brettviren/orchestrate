@@ -10,6 +10,7 @@ import proc
 import tempfile
 import logging
 from util import version_consistent, orch_share_directory
+import download
 shell = '/bin/bash'
 
 
@@ -174,13 +175,12 @@ class ShimPackage(object):
     }
 
     # required variables
-    required = ['package_name', 'package_version', 'package_url',
+    required = ['package_name', 'package_version', 'package_url', 'download_dir',
                 'source_dir', 'unpacked_dir', 'build_dir', 'install_dir',
                 'shim_path']
 
     def __init__(self, steps = None, **vars):
 
-        print 'steps: %s' % str(steps)
         if steps:
             self.steps = steps
 
@@ -229,10 +229,8 @@ class ShimPackage(object):
         self.pkg_env_file = self.generate_runner_filename('{package_name}env'.format(**vars))
         package_shim_environment(self.pkg_env_file, psd, env)
 
-        self.runners = {}       # step->script to run
-        for step in self.steps:
-            self.get_runner(step) # trigger dep_setup to be filed
-
+        #self.runners = {s:r for s,r in zip(self.steps,map(self.make_runner, self.steps))}
+        self._runners_cache = {}
         return
 
 
@@ -249,17 +247,14 @@ class ShimPackage(object):
         'Return list of names of shims on which this one depends'
         return map(lambda x: x[0], self.dep_ver)
 
-    def get_gen_dir(self):
-        odir = os.path.join(self.vars['build_dir'],'orch')
-        if not os.path.exists(odir):
-            os.makedirs(odir)
-        return odir
-
     def generate_runner_filename(self, step):
         '''
         Generate a runner file name for given step.  Runners go in build_dir/orch/.
         '''
-        return os.path.join(self.get_gen_dir(), step)
+        odir = os.path.join(self.vars['build_dir'],'orch')
+        if not os.path.exists(odir):
+            os.makedirs(odir)
+        return os.path.join(odir, step)
 
     def get_rundir(self, step):
         '''
@@ -268,41 +263,60 @@ class ShimPackage(object):
         rundir = self.rundirs.get(step, 'build_dir')
         return self.vars[rundir]
 
-    def get_runner(self, step):
-        '''
-        Return the runner script for given step.
-        '''
-        runner = self.runners.get(step)
-        if runner: return runner
+    def run(self, step):
+        runner = self._runners_cache.get(step)
+        if runner:
+            return runner()
+        runner = self.make_runner(step)
+        if not runner:
+            return
+        self._runners_cache[step] = runner
+        return runner()
 
-        script = self.shim_scripts[step]
-        if not script:
-            return None
+
+    def run_bogus(self):
+        '''
+        A bogus built in
+        '''
+        msg = 'bogus runner called on {package_name}/{package_version}'.format(**self.vars)
+        logging.warning(msg)
+        return
+
+    def run_download(self):
+        '''
+        Download the <package_url> to the <download_dir>.
+        '''
+        return download.get(self.vars['package_url'],self.vars['download_dir'], 
+                            self.vars.get('download_final'))
+        
+
+    def make_runner(self, step):
+        '''
+        Make a runner for given step.
+        '''
+        script = self.shim_scripts.get(step)
+        if not script:          # maybe a builtin?
+            meth = self.__class__.__dict__.get('run_' + step)
+            if not meth:
+                return
+            def meth_curry():
+                return meth(self)
+            return meth_curry
 
         args = []
-
         runner = self.generate_runner_filename(step)
         rundir = self.get_rundir(step)
         self.prepare_runner(runner, script, rundir, *args)
-        self.runners[step] = runner
-        return runner
+        def runner_curry():
+            cmdstr = '%s %s' % (shell, runner)
+            logging.info('Executing shim script %s' % cmdstr)
 
-    def run(self, step):
-        runner = self.get_runner(step)
-        if not runner:
-            logging.info('No shim script for step "%s" of package "%s"' % \
-                             (step, self.vars['package_name']))
-            return
-        cmdstr = '%s %s' % (shell, runner)
-        logging.info('Executing shim script %s' % cmdstr)
-
-        rc = proc.run(cmdstr)
-        if rc != 0:
-            msg = 'Failed to run %s of %s/%s' % \
-                (runner, self.vars['package_name'], self.vars['package_version'])
-            raise RuntimeError, msg
-        return
-
+            rc = proc.run(cmdstr)
+            if rc != 0:
+                msg = 'Failed to run %s of %s/%s' % \
+                      (runner, self.vars['package_name'], self.vars['package_version'])
+                raise RuntimeError, msg
+        return runner_curry
 
     def prepare_runner(self, filename, script, rundir, *args):
         '''

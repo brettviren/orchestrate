@@ -17,7 +17,7 @@ def test_list():
     '''
     cmd = cmdstr + ' list'
     print 'testing with command: %s' % cmd
-    control.main(cmd.split())
+    control.app_main(cmd.split())
 
 def test_steps():
     '''
@@ -25,7 +25,7 @@ def test_steps():
     '''
     cmd = cmdstr + ' step'
     print 'testing with command: %s' % cmd
-    control.main(cmd.split())
+    control.app_main(cmd.split())
 
 def test_bc():
     '''
@@ -34,10 +34,10 @@ def test_bc():
     for step in shim.ShimPackage.steps:
         cmd = cmdstr + ' --last-step %s --packages bc step' % step
         print 'Test limit with "%s"' % cmd
-        control.main(cmd.split())
+        control.app_main(cmd.split())
 
 
 if '__main__' == __name__:
-    #test_list()
+    test_list()
     test_steps()
     test_bc()

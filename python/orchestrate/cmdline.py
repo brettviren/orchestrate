@@ -5,7 +5,7 @@ Functions following a command line interface to some internal utilities.
 They all takes string args, may print directly and return integer error codes.
 '''
 
-import util, get
+import get
 
 def cmdline_download(*args):
     '''
