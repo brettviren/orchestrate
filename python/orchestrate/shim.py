@@ -28,13 +28,16 @@ def package_shim_directories(pathlist, named, env = None):
     for name in named:
         for path in pathlist:
             pdir = os.path.join(path, name)
+            #logging.debug('Checking shim directory %s' % pdir)
             if not os.path.exists(pdir):
+                #logging.debug('Ignoring nonexistent shim directory %s' % pdir)
                 continue
 
             vshim = os.path.join(pdir, 'version')
 
             # no version shim script, assume applicable
             if not os.path.exists(vshim):
+                #logging.debug('Using versionless shim directory %s' % pdir)
                 ret.append(pdir)
                 continue
 
@@ -199,11 +202,10 @@ class ShimPackage(object):
                 if maybe not in shim_names:
                     shim_names.append(maybe)
 
-        logging.debug('Trying shim names for package "%s": %s' % \
-                          (pname, ', '.join(shim_names)))
-        psd = package_shim_directories(vars['shim_path'].split(':'), 
+        shim_path = vars['shim_path']
+        psd = package_shim_directories(shim_path.split(':'), 
                                        shim_names, env)
-        logging.debug('Using shim directories: %s' % ', '.join(psd))
+        logging.debug('Using shim directories for %s: %s' % (pname, ':'.join(psd)))
 
         # Determine the dependencies, if any, for this package
         dep_shim = package_shim_script('dependencies', psd)
@@ -292,7 +294,7 @@ class ShimPackage(object):
                              (step, self.vars['package_name']))
             return
         cmdstr = '%s %s' % (shell, runner)
-        print 'Executing shim script %s' % cmdstr
+        logging.info('Executing shim script %s' % cmdstr)
 
         rc = proc.run(cmdstr)
         if rc != 0:

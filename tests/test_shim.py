@@ -26,6 +26,15 @@ def test_shim_path():
     sp = get_shim_path()
     assert isinstance(sp, basestring), 'Got weird type for shim path (%s) %s' % (type(sp), sp)
 
+def test_psd():
+    '''
+    Test shim.package_shim_directories
+    '''
+    pathlist = get_shim_path().split(':')
+    psd = shim.package_shim_directories(pathlist, ['bc','autoconf','default'])
+    assert psd, 'Got no psd for bc from %s' % pathlist
+    print 'psd=%s' % ', '.join(psd)
+
 def test_hello():
 
     hello_version = '2.8'
@@ -53,5 +62,6 @@ def test_hello():
         s.run(step)
 
 if '__main__' == __name__:
-    test_shim_path()
-    test_hello()
+    #test_shim_path()
+    test_psd()
+    #test_hello()

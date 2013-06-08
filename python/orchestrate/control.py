@@ -26,7 +26,7 @@ def build_parser():
     parser = argparse.ArgumentParser(description = 'Orchestrate a Suite Installation')
 
     # Global options
-    parser.add_argument('-c', '--config', type=str, action='append',
+    parser.add_argument('-c', '--config', type=str, action='append', required=True,
                         help='Add a suite configuration file.')
     parser.add_argument('-s', '--shims', type=str, action='append', default=list(),
                         help='Set additional shim paths')
@@ -64,10 +64,11 @@ def main(argv = None):
 
     logging.basicConfig(filename=opts.log, 
                         level=logging.DEBUG,
-                        format='%(levelname)-7s %(asctime)-15s %(message)s (%(filename)s:%(lineno)d)')
+                        format='%(levelname)-7s %(message)s (%(filename)s:%(lineno)d)')
 
     orch = app.Orchestrate(opts.config, opts.suite, ':'.join(opts.shims), 
                            list_split(opts.packages), list_split(opts.steps))
+    orch.set_iter_dominance(opts.top_loop)
     steps = truncate_list(orch.steps, opts.last_step)
     packages = truncate_list(orch.packages, opts.last_package)
     orch.set_shims(packages, steps)

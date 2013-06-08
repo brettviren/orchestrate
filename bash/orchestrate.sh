@@ -55,7 +55,7 @@ orch_download () {
     fi
 
     if [ -z "$targetdir" ] ; then
-	targetdir="$ORCH_SOURCE_DIR"
+	targetdir="$ORCH_DOWNLOAD_DIR"
     fi
     if [ ! -d "$targetdir" ] ; then
 	runcmd mkdir -p $targetdir
@@ -72,7 +72,7 @@ orch_download () {
     # try wget
     cmd=$(type -P -f wget)
     if [ -n "$cmd" ] ; then
-	runcmd $cmd --no-check-certificate -O $target $url
+	runcmd $cmd --quiet -nv --no-check-certificate -O $target $url
 	return $?
     fi
 

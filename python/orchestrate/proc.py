@@ -4,7 +4,7 @@ Run a sub process
 '''
 import logging
 
-from subprocess import Popen, PIPE, STDOUT, CalledProcessError
+from subprocess import Popen, PIPE
 
 def logout(text):
     'Default standard output logger'

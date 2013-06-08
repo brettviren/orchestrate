@@ -39,12 +39,10 @@ class ListCommand(object):
         '''
         Run the command on the application
         '''
-        for s in app.shims:
-            print '{package}/{version} using:'.format(**s.vars)
-            for step in s.steps:
-                print '\t%s: %s' % (step, s.shim_scripts[step])
-            for dep in s.dep_ver:
-                print '\tdep: %s' % str(dep)
+        for pkg, step in app.items():
+            s = app.shim(pkg)
+            print '{package}/{version} {step} using: {script}, deps: {deps}'\
+                .format(step=step, script=s.shim_scripts[step], deps=str(s.dep_ver), **s.vars)
 
         return
 
@@ -63,16 +61,19 @@ class CheckCommand(object):
         '''
         Run the command on the application
         '''
-        for s in app.shims:
-            print '%s/%s:' % (s.vars['package_name'], s.vars['package_version'])
-            for k,v in sorted(s.vars.items()):
-                if k in ['package_name','package','package_version','version']:
-                    continue
-                print '\t%s = %s' % (k,v)
+        for pkg, step in app.items():
+            print pkg, step
+
+        # for s in app.shims:
+        #     print '%s/%s:' % (s.vars['package_name'], s.vars['package_version'])
+        #     for k,v in sorted(s.vars.items()):
+        #         if k in ['package_name','package','package_version','version']:
+        #             continue
+        #         print '\t%s = %s' % (k,v)
         return
 
 
-class CheckCommand(object):
+class StepCommand(object):
     '''
     A command to run through the steps
     '''
@@ -87,10 +88,6 @@ class CheckCommand(object):
         '''
         Run the command on the application
         '''
-        for s in app.shims:
-            print '%s/%s:' % (s.vars['package_name'], s.vars['package_version'])
-            for k,v in sorted(s.vars.items()):
-                if k in ['package_name','package','package_version','version']:
-                    continue
-                print '\t%s = %s' % (k,v)
+        for pkg, step in app.items():
+            app(pkg,step)
         return

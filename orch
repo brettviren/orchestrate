@@ -1,0 +1,13 @@
+#!/usr/bin/env python
+'''
+Command line interface to the Orchestration application
+'''
+import os
+import sys
+try:                            # if running from installation
+    import orchestrate
+except ImportError:             # next should work if we are running from source
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__),'python'))
+    import orchestrate
+
+orchestrate.control.main()

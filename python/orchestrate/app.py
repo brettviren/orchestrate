@@ -4,9 +4,11 @@ Main application module interface to orchestrate
 '''
 
 import os
+import itertools
+import logging
+
 import suite
 import shim
-import logging
 from util import order_depends
 from ConfigParser import NoOptionError
 
@@ -30,10 +32,14 @@ def build_shim_path(cfg, extra=None):
     final = []
     for part in shim_path.split(':'):
         part = os.path.realpath(part)
+        if part in final:
+            continue
         if not os.path.exists(part):
             logging.warning('ignoring nonexistent shim directory: %s' % part)
             continue
         final.append(part)
+
+    
     shim_path = ':'.join(final)
     
     if not shim_path:
@@ -41,6 +47,7 @@ def build_shim_path(cfg, extra=None):
 
     cfg.set('global','shim_path',shim_path)
     return shim_path
+
 
 class Orchestrate(object):
     '''
@@ -60,14 +67,22 @@ class Orchestrate(object):
         '''
 
         self.cfg = suite.read_config(config_files)
-        self.varlist = suite.resolve(self.cfg, suitename)
         self.shim_path = build_shim_path(self.cfg, shim_path)
-        logging.info('Using shim path: %s' % self.shim_path)
+        self.varlist = suite.resolve(self.cfg, suitename)
+
+        logging.info('Using shim path: %s' % (self.shim_path,))
 
         self.packages = packages or filter(None, [x.get('package_name') for x in self.varlist])
         self.steps = steps or shim.ShimPackage.steps
         self.shims = []
+        self.package_shim = {}
         return
+
+    def shim(self, package):
+        '''
+        Return shim object for <package>.
+        '''
+        return self.package_shim[package]
 
     def set_shims(self, packages = None, steps = None):
         '''
@@ -81,12 +96,15 @@ class Orchestrate(object):
             self.steps = steps
             
         self.shims = []
+        self.package_shim = {}
         for vars in self.varlist:
-            if not vars['package_name'] in self.packages:
+            pname = vars.get('package_name')
+            if not pname in self.packages:
                 continue
             #print '\n'.join(['%s:%s'%kv for kv in vars.items()])
             s = shim.ShimPackage(steps=self.steps, **vars)
             self.shims.append(s)
+            self.package_shim[pname] = s
 
         logging.debug('Initial set of shims: %s' % ', '.join([x.name for x in self.shims]))
         shim.check_deps(self.shims)
@@ -95,5 +113,28 @@ class Orchestrate(object):
         logging.info('packages: %s' % ', '.join(self.packages))
         return
 
-    
 
+    def step_package_items(self):
+        '''Return sequence of (package, step) which first iterate over all
+        packages for a given step.'''
+        return map(lambda x: (x[1],x[0]), itertools.product(self.steps, self.packages))
+
+    def package_step_items(self):
+        '''Return sequence of (package, step) which first iterate over all
+        steps for a given package.'''
+        return itertools.product(self.packages, self.steps)
+
+    items = package_step_items
+    def set_iter_dominance(self, which):
+        if which.startswith('step'):
+            self.items = self.step_package_items
+        if which.startswith('package'):
+            self.items = self.package_step_items
+        
+
+    def __call__(self, package, step):
+        '''
+        Run the <step> for the <package>.
+        '''
+        shim = self.package_shim[package]
+        shim.run(step)
