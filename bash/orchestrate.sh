@@ -145,6 +145,8 @@ orch_unpack () {
         runcmd tar xjf $what
     elif [ -n "$(echo $what | egrep '.tar')" ] ; then
         runcmd tar xf $what
+    elif [ -n "$(echo $what | egrep '.git$')" ] ; then
+	git --git-dir = $what --work-tree checkout ........
     else
         fail "do not know how to unpack $what"
     fi

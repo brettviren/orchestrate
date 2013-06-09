@@ -48,7 +48,7 @@ def get_package_section(cfg, package, version):
         constraint = section_constraint(section)
         if constraint and not version_consistent(version, constraint):
             continue
-        return dict(cfg.items(section))
+        return dict(cfg.items(section, raw=True))
     raise ValueError, 'No consistent package section for %s/%s found' % \
         (package, version)
 

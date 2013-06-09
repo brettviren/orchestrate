@@ -41,8 +41,9 @@ class ListCommand(object):
         '''
         for pkg, step in app.items():
             s = app.shim(pkg)
+            script = s.shim_scripts[step] or '(none or builtin)'
             print '{package}/{version} {step} using: {script}, deps: {deps}'\
-                .format(step=step, script=s.shim_scripts[step], deps=str(s.dep_ver), **s.vars)
+                .format(step=step, script=script, deps=str(s.dep_ver), **s.vars)
 
         return
 

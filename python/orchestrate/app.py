@@ -137,4 +137,5 @@ class Orchestrate(object):
         Run the <step> for the <package>.
         '''
         shim = self.package_shim[package]
+        logging.info('Running package "%s" step "%s"' % (package, step))
         shim.run(step)

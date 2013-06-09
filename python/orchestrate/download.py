@@ -14,9 +14,19 @@ Each main function takes arguments:
 import os
 import shutil
 import logging
+
+# this is wonky
+# import urllib2
+# urllib2.install_opener(
+#     urllib2.build_opener(
+#         urllib2.ProxyHandler({'http': '127.0.0.1'})
+#     )
+# )
+
 from urllib2 import urlopen, urlparse
 import util
 import proc
+
 
 # fixme: probably need to add an "pull/update" to git/svn methods if the target already exists
 
@@ -26,10 +36,12 @@ def svn(url, targetdir, final=None):
     '''
     print 'in svn: %s' % str(url)
     urlp = urlparse.urlparse(url)
+    util.assuredir(targetdir)
     if not final:
         final = os.path.splitext(os.path.basename(urlp.path))[0]
-    util.assuredir(targetdir)
     fullpath = os.path.join(targetdir, final)
+    if os.path.exists(fullpath):
+        return 0
     rc = proc.run('svn checkout %s %s' % (url, fullpath))
     return rc
 
@@ -40,17 +52,25 @@ def web(url, targetdir, final=None):
 
     if not final:
         final = os.path.basename(url)
-    res = urlopen(url)
-    util.assuredir(targetdir)
     fullpath = os.path.join(targetdir, final)
+    if os.path.exists(fullpath):
+        return 0
+
+    util.assuredir(targetdir)
+    res = urlopen(url)
     targetfp = open(fullpath, 'w')
     shutil.copyfileobj(res, targetfp)
     targetfp.close()
     return 0
 
+
 def query2dict(query):
     'Return a dict from a URL query (stuff after the "?")'
-    return {a:b for a,b in [kv.split('=') for kv in query.split('&')]}
+    if not query: return dict()
+    chunks = query.split('&')
+    if not chunks: return dict()
+    return {a:b for a,b in [kv.split('=') for kv in chunks]}
+
 
 def git(url, targetdir, final = None):
     '''Make a "clone" of a git repository at <url> in to targetdir.  If
@@ -72,6 +92,8 @@ def git(url, targetdir, final = None):
     if not final:
         final = os.path.splitext(os.path.basename(urlp.path))[0]
     fullpath = os.path.join(targetdir, final)
+    if os.path.exists(fullpath):
+        return 0
 
     util.assuredir(targetdir)
     rc = proc.run("git clone %s %s" % (url_no_query, fullpath))
@@ -143,4 +165,5 @@ def get(url, targetdir, final = None):
 
     '''
     method, newurl = guess_method(url)
+    logging.info('downloading by %s: "%s"' % (method.func_name, newurl))
     return method(newurl, targetdir, final)
