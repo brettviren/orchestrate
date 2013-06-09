@@ -74,8 +74,8 @@ def query2dict(query):
 
 def git(url, targetdir, final = None):
     '''Make a "clone" of a git repository at <url> in to targetdir.  If
-    <final> is not given it will be the last part of the <url>'s path
-    (less any ".git" extension and ignoring any URL options).  The URL
+    <final> is not given it will be the last part of the <url>'s path.
+    if <final> ends in '.git' it a bare clone will be made.  The URL
     options can be "tag=<tag>" to specify a tag to checkout.  If a
     "branch=<branch>" is also given it will name the branch hold the
     tagged checkout.  If no branch is given it defaults to the tag
@@ -90,13 +90,16 @@ def git(url, targetdir, final = None):
 
     url_no_query = urlparse.ParseResult(urlp.scheme, urlp.netloc, urlp.path, '', '', '').geturl()
     if not final:
-        final = os.path.splitext(os.path.basename(urlp.path))[0]
+        final = os.path.basename(urlp.path)
+    bare = ""
+    if final.endswith('.git'):
+        bare = '--bare'
     fullpath = os.path.join(targetdir, final)
     if os.path.exists(fullpath):
         return 0
 
     util.assuredir(targetdir)
-    rc = proc.run("git clone %s %s" % (url_no_query, fullpath))
+    rc = proc.run("git clone %s %s %s" % (bare, url_no_query, fullpath))
     if rc: return rc
     
     if not tag:
@@ -147,7 +150,7 @@ def guess_method(url):
     # what is left might be svn or plain web.  Let's check
     url_no_query = urlparse.ParseResult(urlp.scheme, urlp.netloc, urlp.path, '', '', '').geturl()
     def noop(stuff): pass       # keep proc quiet
-    rc = proc.run('svn info %s' % url_no_query, logout=noop, logerr=noop)
+    rc = proc.run('svn info %s' % url_no_query, logger=noop)
     if rc == 0:
         return (svn, url)
 

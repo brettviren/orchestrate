@@ -21,10 +21,13 @@ import tarfile
 import proc
 import util
 
-def prepare(dst, creates):
+def prepare(src, dst, creates):
     '''If <creates> exists, do nothing.  Otherwise make sure directory
     <dst> exists.  Return true if actual unpacking should continue.
     '''
+    if not os.path.exists(src):
+        raise ValueError, 'No such source to unpack: %s' % src
+
     if creates:
         if not creates.startswith('/'):
             creates = os.path.join(dst,creates)
@@ -39,7 +42,7 @@ def unzip(src, dst, creates=None):
     Unzip <src> file into <dst> directory unless <creates> already exists.
     '''
 
-    if not prepare(dst, creates):
+    if not prepare(src, dst, creates):
         return
 
     # http://stackoverflow.com/questions/7806563/how-to-unzip-a-file-with-python-2-4
@@ -61,7 +64,7 @@ def untar(src, dst, creates=None):
     Untar <src> file into <dst> directory unless <creates> already exists
     '''
 
-    if not prepare(dst, creates):
+    if not prepare(src, dst, creates):
         return
     
     tf = tarfile.open(src)
@@ -80,10 +83,10 @@ def ungit(src, dst, creates, treeish='HEAD'):
     optional git "treeish" can be specified, else HEAD is used.
     '''
 
-    if not prepare(dst, creates):
+    if not prepare(src, dst, creates):
         return
 
-    cmd = 'git --git-dir={src} archive --format=tar --prefix={creates}/ {treeish} | tar -xvf- -C {dst}'.format(**locals())
+    cmd = 'git --git-dir={src} archive --format=tar --prefix={creates}/ {treeish} | tar -xf- -C {dst}'.format(**locals())
     print cmd
     return proc.run(cmd)
     

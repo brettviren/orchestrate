@@ -166,6 +166,9 @@ def git_repo(path):
     '''
     Return the git repository associated with the directory or None.
     '''
+    if not os.path.isdir(path):
+        return None
+
     def isgit(d):
         must_have = ['branches', 'config', 'description', 'HEAD', 
                      'hooks', 'info', 'objects', 'refs']
@@ -176,8 +179,23 @@ def git_repo(path):
     while path:
         if isgit(path): 
             return path
-        pathdotgit = os.path.join(path,'.git')
+        pathdotgit = os.path.join([path,'.git'])
         if isgit(pathdotgit): 
             return pathdotgit
         path = os.path.dirname(path)
     return None
+
+class cd:
+    '''
+    with cd("/path/to/whatever"):
+        do_something()
+    '''
+    def __init__(self, newPath):
+        self.newPath = newPath
+
+    def __enter__(self):
+        self.savedPath = os.getcwd()
+        os.chdir(self.newPath)
+
+    def __exit__(self, etype, value, traceback):
+        os.chdir(self.savedPath)

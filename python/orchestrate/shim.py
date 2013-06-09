@@ -9,7 +9,7 @@ import os
 import proc
 import tempfile
 import logging
-from util import version_consistent, orch_share_directory, git_repo
+from util import version_consistent, orch_share_directory, git_repo, cd
 import download, unpack
 shell = '/bin/bash'
 
@@ -286,8 +286,10 @@ class ShimPackage(object):
         '''
         Download the <source_url> to the <download_dir>.
         '''
-        return download.get(self.vars['source_url'],self.vars['download_dir'], 
-                            self.vars.get('download_final'))
+        with cd(self.get_rundir('download')):
+            rc = download.get(self.vars['source_url'],self.vars['download_dir'], 
+                              self.vars.get('download_final'))
+        return rc
         
     def run_unpack(self):
         '''Unpack source into <source_dir>.  Source is taken from
@@ -299,7 +301,10 @@ class ShimPackage(object):
         will be used as indication that the unpacking has already been
         done.
         '''
+        dldir = self.vars.get('download_dir')
         src = self.vars.get('source_package')
+        if not src.startswith('/'):
+            src = os.path.join(dldir, src)
         dst = self.vars.get('source_dir')
         if not (src and dst):
             raise ValueError, 'Need both a source_package (got: "%s") and a source_dir (got: "%s" for unpacking' % (src,dst)
@@ -310,6 +315,8 @@ class ShimPackage(object):
             if creates:
                 creates = os.path.join(dst, creates)
         dst,creates = os.path.split(creates)
+
+        logging.debug('builtin unpack: src:%s dst:%s creates:%s' % (src,dst,creates))
 
         isgit = git_repo(src)
         if isgit:
@@ -351,8 +358,9 @@ class ShimPackage(object):
         '''
         Prepare runner script writing into file object.
         '''
-        if os.path.exists(filename):
-            return
+        # fixme: make this optional dependent on a "force" value
+        #if os.path.exists(filename):
+        #    return
         fp = open(filename,'w')
 
         funcs = os.path.join(orch_share_directory('bash'),  'orchestrate.sh')

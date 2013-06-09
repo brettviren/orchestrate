@@ -2,18 +2,16 @@
 '''
 Run a sub process
 '''
+import os
 import logging
 
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, STDOUT
 
 def logout(text):
     'Default standard output logger'
     logging.info(text.strip())
-def logerr(text):
-    'Default standard error logger'
-    logging.warning(text.strip())
 
-def run(cmdstr, env=None, logout=logout, logerr=logerr, shell=True):
+def run(cmdstr, env=None, logger=logout, shell=True):
     '''
     Run the command <cmdstr> and return its error code.
 
@@ -29,17 +27,16 @@ def run(cmdstr, env=None, logout=logout, logerr=logerr, shell=True):
     stdout, stderr = None, None
     if logout:
         stdout = PIPE
-    if logerr:
-        stderr = PIPE
+        stderr = STDOUT
 
     if not shell:
         cmdstr = cmdstr.split()
 
     logging.debug('proc running: "%s"' % cmdstr)
-    p = Popen(cmdstr, stdout=stdout, stderr=stderr, 
+    p = Popen(cmdstr, stdin=open(os.devnull), stdout=stdout, stderr=stderr, 
               universal_newlines=True, env=env, shell=shell)
 
-    if not (logout or logerr):  # no need to be fancy
+    if not logger:  # no need to be fancy
         p.communicate()
         return p.returncode
 
@@ -47,28 +44,18 @@ def run(cmdstr, env=None, logout=logout, logerr=logerr, shell=True):
     res = None
     while True:
 
-        if logout:
-            out = p.stdout.readline()
-        if logerr:
-            err = p.stderr.readline()
-
+        out = p.stdout.readline()
         res = p.poll()
 
-        if logout and out:
-            logout(out)
-        if logerr and err:
-            logerr(err)
+        if out:
+            logger(out)
 
         if res == None:
             continue
 
         # slurp up any remaining output
-        if logout:
-            for out in p.stdout.readlines():
-                logout(out)
-        if logerr:
-            for err in p.stderr.readlines():
-                logerr(err)
+        for out in p.stdout.readlines():
+            logger(out)
 
         break
     return res

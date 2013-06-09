@@ -281,14 +281,16 @@ When the shim script is implemented in =/bin/bash=, a collection of =bash= funct
 
 * Orchestration Applications
 
-The orchestration applications must adhere to the protocol as described above but are otherwise free of restriction.  Required features include:
+Many orchestration applications may be built from the =orchestrate= Python module.  This package provides the program =orch= which provides a command line interface.  In general it is called like:
 
- - Check correctness of a suite configuration file
- - List packages and versions in a suite
- - Install a consistent subset of a suite
- - Work out global installation order based on declared dependencies
- - Implement breadth-first or depth-first build
- - Perform actions for and report their results to the user in detail (to support detailed continuous integration)
+#+BEGIN_EXAMPLE
+orch [global options] <command> [command options]
+#+END_EXAMPLE
+
+The commands are:
+
+ - =list= :: list information about packages and installation steps that would occur
+ - =step= :: actually step through the installation
 
 
 * Orchestration =bash= Utility Functions

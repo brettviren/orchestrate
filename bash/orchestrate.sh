@@ -176,7 +176,7 @@ orch_configure () {
 	idem "configure: already run in $(pwd)"
 	return
     fi
-    $ORCH_UNPACKED_DIR/configure --prefix $ORCH_INSTALL_DIR "$@"
+    $ORCH_UNPACKED_DIR/configure --prefix=$ORCH_INSTALL_DIR "$@"
 }
 
 

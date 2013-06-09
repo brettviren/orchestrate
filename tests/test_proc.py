@@ -11,18 +11,13 @@ class Printer(object):
     def __init__(self, command):
         print 'Running: "%s"' % command
         self.prefix = command.split()[0]
-
-
-    def out(self, stuff):
+    def __call__(self, stuff):
         print '[%s] out: "%s"' % (self.prefix, stuff.strip())
-
-    def err(self, stuff):
-        print '[%s] err: "%s"' % (self.prefix, stuff.strip())
     
 
 def do_run(cmd, code = 0):
     p = Printer(cmd)
-    rc = proc.run(cmd, logout=p.out, logerr=p.err)
+    rc = proc.run(cmd, logger=p)
     assert rc == code, 'got unexpected code %d != %d' % (rc, code)
 
 

@@ -1,0 +1,2 @@
+#!/bin/bash
+runcmd $ORCH_UNPACKED_DIR/configure --prefix=$ORCH_INSTALL_DIR
