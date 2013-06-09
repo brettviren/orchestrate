@@ -5,6 +5,8 @@ Test the orchestrate.proc module
 
 from orchestrate import proc
 
+import tempfile
+
 class Printer(object):
     def __init__(self, command):
         print 'Running: "%s"' % command
@@ -33,5 +35,15 @@ def test_simple():
     for cmd, code in cmds:
         do_run(cmd, code)
 
+def test_pipe():
+    do_run('ls /tmp | sort -n')
+
+def test_git_pipe():
+    dst = tempfile.mkdtemp()
+    cmd='git --git-dir=.git archive --format=tar --prefix=orchtest/ HEAD | tar -xvf- -C %s'%dst
+    do_run(cmd)
+
 if '__main__' == __name__:
     test_simple()
+    test_pipe()
+    test_git_pipe()

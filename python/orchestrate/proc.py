@@ -13,7 +13,7 @@ def logerr(text):
     'Default standard error logger'
     logging.warning(text.strip())
 
-def run(cmdstr, env=None, logout=logout, logerr=logerr):
+def run(cmdstr, env=None, logout=logout, logerr=logerr, shell=True):
     '''
     Run the command <cmdstr> and return its error code.
 
@@ -32,9 +32,12 @@ def run(cmdstr, env=None, logout=logout, logerr=logerr):
     if logerr:
         stderr = PIPE
 
+    if not shell:
+        cmdstr = cmdstr.split()
+
     logging.debug('proc running: "%s"' % cmdstr)
-    p = Popen(cmdstr.split(), stdout=stdout, stderr=stderr, 
-              universal_newlines=True,env=env)
+    p = Popen(cmdstr, stdout=stdout, stderr=stderr, 
+              universal_newlines=True, env=env, shell=shell)
 
     if not (logout or logerr):  # no need to be fancy
         p.communicate()

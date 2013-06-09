@@ -162,3 +162,22 @@ def assuredir(directory):
     os.makedirs(directory)
     return True
 
+def git_repo(path):
+    '''
+    Return the git repository associated with the directory or None.
+    '''
+    def isgit(d):
+        must_have = ['branches', 'config', 'description', 'HEAD', 
+                     'hooks', 'info', 'objects', 'refs']
+        for mh in must_have:
+            if not os.path.exists(os.path.join(d,mh)):
+                return False
+        return True
+    while path:
+        if isgit(path): 
+            return path
+        pathdotgit = os.path.join(path,'.git')
+        if isgit(pathdotgit): 
+            return pathdotgit
+        path = os.path.dirname(path)
+    return None

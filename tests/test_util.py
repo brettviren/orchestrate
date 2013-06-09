@@ -66,9 +66,20 @@ def test_order_depends():
     got = ', '.join([x.name for x in olst])
     assert got == want, 'bad order, got: %s, want: %s' % (got, want)
 
+def test_git_repo():
+    '''
+    Test orchestrate.util.git_repo
+    '''
+    from orchestrate.util import git_repo
+    mydir = os.path.dirname(os.path.realpath(__file__))
+    got = git_repo(mydir)
+    want = os.path.join(os.path.dirname(mydir),'.git')
+    assert got == want, 'Got something unexpected: %s, wanted: %s' % (got, want)
+
 if __name__ == '__main__':
     test_version_consistent()
     test_host_description()
     test_share_directory()
     test_split_list()
     test_order_depends()
+    test_git_repo()

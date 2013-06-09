@@ -9,8 +9,8 @@ import os
 import proc
 import tempfile
 import logging
-from util import version_consistent, orch_share_directory
-import download
+from util import version_consistent, orch_share_directory, git_repo
+import download, unpack
 shell = '/bin/bash'
 
 
@@ -289,6 +289,35 @@ class ShimPackage(object):
         return download.get(self.vars['package_url'],self.vars['download_dir'], 
                             self.vars.get('download_final'))
         
+    def run_unpack(self):
+        '''Unpack source into <source_dir>.  Source is taken from
+        <source_archive> which may be a zip or tar file (with various
+        compression methods supported) or a git directory.  If it is a
+        git directory the <source_tag> is used to determine what is
+        checked out into <source_dir>.  If <unpacked_dir> or
+        <unpacked_subdir> (relative to <source_dir>) are defined they
+        will be used as indication that the unpacking has already been
+        done.
+        '''
+        src = self.vars.get('source_archive')
+        dst = self.vars.get('source_dir')
+        if not (src and dst):
+            raise ValueError, 'Need both a source_archive and a source_dir for unpacking'
+
+        creates = self.vars.get('unpacked_dir')
+        if not creates:
+            creates = self.vars.get('unpacked_subdir')
+            if creates:
+                creates = os.path.join(dst, creates)
+        dst,creates = os.path.split(creates)
+
+        isgit = git_repo(src)
+        if isgit:
+            tag = self.vars.get('source_tag','HEAD')
+            return unpack.ungit(isgit, dst, creates, tag)
+        if src.endswith('.zip'):
+            return unpack.unzip(src, dst, creates)
+        return unpack.untar(src, dst, creates)
 
     def make_runner(self, step):
         '''
