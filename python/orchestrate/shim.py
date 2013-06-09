@@ -175,7 +175,7 @@ class ShimPackage(object):
     }
 
     # required variables
-    required = ['package_name', 'package_version', 'package_url', 'download_dir',
+    required = ['package_name', 'package_version', 'source_url', 'download_dir',
                 'source_dir', 'unpacked_dir', 'build_dir', 'install_dir',
                 'shim_path']
 
@@ -284,29 +284,29 @@ class ShimPackage(object):
 
     def run_download(self):
         '''
-        Download the <package_url> to the <download_dir>.
+        Download the <source_url> to the <download_dir>.
         '''
-        return download.get(self.vars['package_url'],self.vars['download_dir'], 
+        return download.get(self.vars['source_url'],self.vars['download_dir'], 
                             self.vars.get('download_final'))
         
     def run_unpack(self):
         '''Unpack source into <source_dir>.  Source is taken from
-        <source_archive> which may be a zip or tar file (with various
+        <source_package> which may be a zip or tar file (with various
         compression methods supported) or a git directory.  If it is a
         git directory the <source_tag> is used to determine what is
         checked out into <source_dir>.  If <unpacked_dir> or
-        <unpacked_subdir> (relative to <source_dir>) are defined they
+        <unpacked_reldir> (relative to <source_dir>) are defined they
         will be used as indication that the unpacking has already been
         done.
         '''
-        src = self.vars.get('source_archive')
+        src = self.vars.get('source_package')
         dst = self.vars.get('source_dir')
         if not (src and dst):
-            raise ValueError, 'Need both a source_archive and a source_dir for unpacking'
+            raise ValueError, 'Need both a source_package (got: "%s") and a source_dir (got: "%s" for unpacking' % (src,dst)
 
         creates = self.vars.get('unpacked_dir')
         if not creates:
-            creates = self.vars.get('unpacked_subdir')
+            creates = self.vars.get('unpacked_reldir')
             if creates:
                 creates = os.path.join(dst, creates)
         dst,creates = os.path.split(creates)

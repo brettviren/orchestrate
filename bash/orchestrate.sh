@@ -57,19 +57,21 @@ append () {
 }    
 
 
-## Download a file from a <URL> (default is package_url) to an optionally specified <targetdir> (default is source_dir)
+## Download a file from a <URL> (default is source_url) to an
+## optionally specified <targetdir> (default is source_dir)
 ## orch_download [<URL>] [<targetdir>]
 ## 
 ## This downloads via "wget" or "curl".
 ##
 ## Note: explicit "download" shim scripts are normally not required.
 ## The builtin can handle more types of downloads than this function.
+## 
 orch_download () {
     local url=$1 ; shift
     local targetdir=$1 ; shift
 
     if [ -z "$url" ] ; then
-	url="$ORCH_PACKAGE_URL"
+	url="$ORCH_SOURCE_URL"
     fi
 
     if [ -z "$targetdir" ] ; then
@@ -111,17 +113,22 @@ orch_download () {
 
 ## unpack <archive> to <where> creating <creates>
 ## defaults: 
-##   archive: $ORCH_SOURCE_DIR/$(basename $ORCH_PACKAGE_URL)
+##   archive: $ORCH_SOURCE_DIR/$(basename $ORCH_SOURCE_URL)
 ##   where: $ORCH_SOURCE_DIR
 ##   creates: $ORCH_UNPACKED_DIR
 ## orch_unpack <archive> [<where>] [<creates>]
+##
+## Note, in most cases package shims are better off to rely on the
+## builtin unpack method instead of calling this.  Only if additional
+## unpacking is needed should this function be used and it should be
+## called with explicit arguments.
 orch_unpack () {
     local what=$1 ; shift       # the archive file to unpack
     local where=$1 ; shift      # directory in which to unpack
     local creates=$1 ; shift    # something that the unpacking creates
 
     if [ -z "$what" ] ; then
-	what="$ORCH_DOWNLOAD_DIR/$(basename $ORCH_PACKAGE_URL)"
+	what="$ORCH_DOWNLOAD_DIR/$(basename $ORCH_SOURCE_URL)"
     fi
     if [ -z "$where" ] ; then
 	where=$ORCH_SOURCE_DIR

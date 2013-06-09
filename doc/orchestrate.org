@@ -59,12 +59,14 @@ Values in the suite configuration file are interpreted as strings.  They can be 
 This means each package receives a somewhat different set of variables and values which has been tailored to the package.
 The set of package variables are communicated to the shim scripts through environment variables formed by up-casing the configuration variable names and prepending an =ORCH_= string to their name.  Shim scripts should honor the value and intent of these variables.  Author of shim script may add additional variables to the corresponding section in the configuration file as required.
 
-Variables which are defined by the orchestration application include:
+Variables which are defined by the orchestration application and useful for crafting the configuration:
 
  - =suite= :: the suite name
- - =package= :: the name of the current package
- - =version= :: the version string of the current package
- - =version_underscore= :: as above but with dots replaced with underscores
+ - =package= :: the name of the current package (=package_name= is an alias)
+ - =version= :: the version string of the current package (=package_version= is an alias)
+ - =version_underscore= :: the version string with dots replaced with underscores
+ - =version_2digit= :: the version string with at most two "digits"
+ - =version_nodots= :: the version string all periods removed
  - =ups_flavor= :: the UPS flavor string for the build host
  - =tagsdash= :: the list of tags joined by a dash 
  - =tagscolon= :: the list of tags joined by a colon
@@ -78,19 +80,21 @@ The naming conventions for variables are:
  - =*_dir= :: holds the name of an absolute directory
  - =*_reldir= :: holds a single, relative directory 
 
-Standard variables which describe package layout.  
+Optional but useful variable patterns: 
 
  - =unique_reldir= :: not strictly needed but useful for defining a package/version specific sub directory
  - =base_dir= :: not strictly needed but can be used to define a root directory into which all other directories are based
- - =download_dir= :: directory containing source packages (archive files or repository checkouts)
- - =source_dir= :: a base directory into which read-to-use source is placed, usually made at least package and version specific
- - =unpacked_dir= :: the directory, usually under =source_dir= which contains the unpacked source
+
+Variables that are likely required for each package:
+
+ - =download_dir= :: directory containing the =source_package= (archive files or git repository)
+ - =source_url= :: a web or CVS URL to the source package stored on a remote server
+ - =source_package= :: the name of the archive file or git repository directory if the built in =unpack= is used
+ - =source_tag= :: a tag used when producing source from a repository
+ - =source_dir= :: a base directory into which ready-to-use source is placed, this is usually named to be at least package and version specific
+ - =unpacked_dir= :: the absolute directory which contains the unpacked source.  this is usually build from =<source_dir>/<unpacked_reldir>= 
  - =build_dir= :: a base directory where the package may be built
  - =install_dir= :: the base ("prefix") directory where the final installation is placed
-
-To locate a source package one defaine
-
- - =package_url= :: a web or CVS URL
 
 By default, package shims having the same name as the package itself are searched.  This behavior can be changed by setting
 
@@ -102,25 +106,25 @@ In this manner one can create a cascade of sources of shim scripts.  A =default=
 It is useful to exploit reoccurring patterns in the suite installation.  For example, a vast majority of package source archive files follow a pattern in their name and extension and in the directory produced when they are unpacked.  One can reflect this pattern in the configuration file by, for example, defining:
 
  - =unpacked_reldir= :: defined as ={package}-{version}=
- - =tarball_ext= :: defined as =tar.gz=
- - =tarball= :: defined as ={unpacked_reldir}.{tarball_ext}=
+ - =srcpkg_ext= :: defined as =tar.gz=
+ - =source_package= :: defined as ={unpacked_reldir}.{srcpkg_ext}=
 
 Then, any packages which deviate from this common pattern can override one or more of these variables, as required, in their =[package]= section.
 
 #+BEGIN_EXAMPLE
 [package deviant]
-tarball_ext = tgz
-package_url = http://deviant.example.com/source/{tarball}
+srcpkg_ext = tgz
+source_url = http://deviant.example.com/source/{source_package}
 #+END_EXAMPLE
 
-This change will work its way up to the =tarball= definition and back down to the =package_url= one.  Notice that this package configuration section is completely independent of detail of the package.  If its version must change this is done in the =packagelist= only.  
+This change will work its way up to the =source_package= definition and back down to the =source_url= one.  Notice that this package configuration section is completely independent of detail of the package.  If its version must change this is done in the =packagelist= only.  
 
 On the other hand, if the upstream developers are particularly evil they will change the location of their source package on you.  For example, say that as of version 2 they put all version 1 code into a different location on their server.  This can be handled by adding a new, addition package section :
 
 #+BEGIN_EXAMPLE
 [package deviant version < 2]
-tarball_ext = tgz
-package_url = http://deviant.example.com/obsolete/source/{tarball}
+srcpkg_ext = tgz
+source_url = http://deviant.example.com/obsolete/source/{source_package}
 #+END_EXAMPLE
 
 An example suite configuration file used by the tests is provided in [[../tests/test.cfg][tests/test.cfg]] additional ones are under the [[../examples/][examples]] directory.
@@ -195,7 +199,7 @@ The environment produced by sourcing the result of this shim script is not used 
 
 *** Download
 
-The =download= shim script is used to retrieve the source code given the =ORCH_PACKAGE_URL= into the =ORCH_SOURCE_DIR=.  This directory will be the current working directory where this script is called.  This script only needs implementation only for unusual download methods that are not directly implemented by the application.
+The =download= shim script is used to retrieve the source code given the =ORCH_SOURCE_URL= into the =ORCH_SOURCE_DIR=.  This directory will be the current working directory where this script is called.  This script only needs implementation only for unusual download methods that are not directly implemented by the application.
 
 *** Unpack
 
@@ -257,7 +261,7 @@ The following orchestration environment variable are guaranteed to be defined in
  - =ORCH_LOG= :: a log file to which the shim may append messages (script should not truncate!)
  - =ORCH_PACKAGE_NAME= :: the current package name
  - =ORCH_PACKAGE_VERSION= :: the current package version string
- - =ORCH_PACKAGE_URL= :: the URL for the source code
+ - =ORCH_SOURCE_URL= :: the URL for the source code
  - =ORCH_SOURCE_DIR= :: the full path to a directory in which the source must be unpacked
  - =ORCH_UNPACKED_DIR= :: the full path to the unpacked source.
  - =ORCH_BUILD_DIR= :: the full path to a directory in which to build the source

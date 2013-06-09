@@ -32,7 +32,7 @@ def hello_vars():
                 download_dir = '/tmp/test_shim/downloads',
                 package_name = 'hello',
                 package_version = '2.8',
-                package_url = 'http://ftp.gnu.org/gnu/hello/%s.tar.gz'%hello_pkg_name,
+                source_url = 'http://ftp.gnu.org/gnu/hello/%s.tar.gz'%hello_pkg_name,
             )
 def test_shim_path():
     sp = get_shim_path()

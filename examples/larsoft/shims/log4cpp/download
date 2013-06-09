@@ -5,9 +5,9 @@
 # http://www.miscdebris.net/blog/2010/04/06/use-curl-to-download-a-file-from-sourceforge-mirror/
 
 cd "$ORCH_DOWNLOAD_DIR"
-if [ -f "$ORCH_DOWNLOAD_DIR/$ORCH_TARBALL" ] ; then
-    idem "Already downloaded from lame sf.net: $ORCH_PACKAGE_URL"
+if [ -f "$ORCH_DOWNLOAD_DIR/$ORCH_SOURCE_PACKAGE" ] ; then
+    idem "Already downloaded from lame sf.net: $ORCH_SOURCE_URL"
     return
 fi
 
-curl -L -O "$ORCH_PACKAGE_URL" 
+curl -L -O "$ORCH_SOURCE_URL" 
