@@ -21,19 +21,22 @@ def get_shim_path():
         shim_path.append(path)
     return ':'.join(shim_path)
     
-def hello_vars():
-    hello_version = '2.8'
-    hello_pkg_name = 'hello-%s' % hello_version,
+def make_vars(pkg, ver):
+    namever = '%s-%s' % (pkg,ver)
+    tarball = '%s.tar.gz'%namever
     return dict(shim_path = get_shim_path(),
-                unpacked_dir = '/tmp/test_shim/source/%s'%hello_pkg_name,
-                install_dir = '/tmp/test_shim/install',
-                build_dir = '/tmp/test_shim/build',
+                unpacked_dir = '/tmp/test_shim/source/%s'%namever,
+                install_dir = '/tmp/test_shim/install/',
+                build_dir = '/tmp/test_shim/build/%s'%namever,
                 source_dir = '/tmp/test_shim/source',
                 download_dir = '/tmp/test_shim/downloads',
-                package_name = 'hello',
-                package_version = '2.8',
-                source_url = 'http://ftp.gnu.org/gnu/hello/%s.tar.gz'%hello_pkg_name,
+                package_name = pkg,
+                package_version = ver,
+                source_package = tarball,
+                source_url = 'http://ftp.gnu.org/gnu/%s/%s'%(pkg,tarball),
+                shim_names = '%s,autoconf'%pkg,
             )
+
 def test_shim_path():
     sp = get_shim_path()
     assert isinstance(sp, basestring), 'Got weird type for shim path (%s) %s' % (type(sp), sp)
@@ -47,29 +50,41 @@ def test_psd():
     assert psd, 'Got no psd for bc from %s' % pathlist
     print 'psd=%s' % ', '.join(psd)
 
-def test_builtin():
-    vars = hello_vars()
-    s = shim.ShimPackage(**vars)
-    print 'Running run("bogus")'
-    s.run('bogus')
-    print 'Running run_bogus()'
-    s.run_bogus()
+def test_steps():
+    bvars = make_vars('bc','1.06')
+    hvars = make_vars('hello','2.8')
+    bs = shim.ShimPackage(**bvars)
+    hs = shim.ShimPackage(**hvars)
+    shim_list = [bs,hs]
+    for s in shim_list:
+        s.setup(shim_list)
+    for s in shim_list:
+        print 'Running %s.run("bogus")' % s.name
+        try:
+            s.run('bogus')
+        except KeyError:
+            print 'Caught expected run of bogus step'
 
-def test_hello():
-
-    vars = hello_vars()
-    s = shim.ShimPackage(**vars)
-
-    print 'orch env file:', s.orch_env_file
-    print 'pkg env file:', s.pkg_env_file
-    print 'deps:', s.dep_ver
+        print 'Running %s.run_bogus()' % s.name
+        s.run_bogus()
 
     for step in s.steps:
         print 'Running shim step: %s' % step
-        s.run(step)
+        bs.run(step)
+        hs.run(step)
+
+def test_hello_names():
+
+    vars = make_vars('hello','2.8')
+    s = shim.ShimPackage(**vars)
+
+    for gt in s.generated_filetypes:
+        print '%s: %s' % (gt, s.generated_filename(gt))
+    print 'deps:', s.dep_pkgcon
+
 
 if '__main__' == __name__:
-    test_shim_path()
-    test_psd()
-    test_builtin()
-    test_hello()
+    # test_shim_path()
+    # test_psd()
+    # test_hello_names()
+    test_steps()

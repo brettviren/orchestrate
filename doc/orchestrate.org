@@ -145,13 +145,13 @@ Each package provides a set of shim scripts that override the default behavior p
 
 Some general rules governing the shim scripts:
 
- - A script file which implements a step must take the same name as the step it implements. 
- - Any step which is not required or is not applicable for a given package may simply be omitted.  
- - Each shim script must exit immediately and return a non-zero return code to the calling environment if any error is encountered.   
- - Any standard output or standard error produced is logged by the application but otherwise not considered by the application (see the =ORCH_LOG= variable below).  
- - Some scripts are given command line arguments and all may check environment variables set by the application as described below.  
- - From the point of view of the package shim the scripts are executed in the order listed above.  However the application may do either a depth-first or a breadth-first descent when dealing with a full suite of packages.
- - Shim scripts may be called multiple times (see section [[sec:shim-behavior]]).
+ - name :: a script file which implements a step must take the same base name as the step it implements. 
+ - optional :: any step which is not required or is not applicable for a given package may simply be omitted.  
+ - errors :: each shim script must exit immediately and return a non-zero return code to the calling environment if any error is encountered.   
+ - logging :: any standard output or standard error produced is logged by the application but otherwise not considered by the application (see the =ORCH_LOG= variable below).  
+ - input :: some scripts are given command line arguments and all may check environment variables set by the application as described below.  
+ - order :: from the point of view of the package shim the scripts are executed in the order listed above.  However the application may do either a depth-first or a breadth-first descent when dealing with a full suite of packages.
+ - idempotent :: Shim scripts may be called multiple times through multiple invocations of the application by the user but will only be called at most once per invocation (see section [[sec:shim-behavior]]).
 
 The following sub-sections describe specifics about each step
 
@@ -191,10 +191,30 @@ bugpackage version != 3.14159
 
 *** Environment
 
-The =environment= shim script is run to produce a script that can modify =bash= environment in order to use or build against the package.  This environment modification code must be generated independent of whether the package has been installed yet or not.  The script is written to the file named by the single command line argument given to =environment=.  If the package depends on other packages in the suite they must be declared as described in the next section.  The =environment= shim script may then assume that the setup script produced by the package's dependencies have also been sourced into the user environment just before its own setup script will be sourced.  The setup script may make use of the library of =bash= functions in =orchestrate.sh= provided by the orchestration application.  See section [[sec:bash]] for details.  No other special assumptions 
-should be made about the calling environment.  
+The =environment= shim script is run to produce a =bash= script file that can set or otherwise modify a =bash= environment.  Sourcing the emitted script should allow the calling environment to be able to build against or otherwise "run" the current package.  If any package depends on the current package, as declared by the =dependencies= step, its shim scripts (except for =version= and =dependencies=) will run in an environment which incorporates the emitted script.  It should be noted that the emitted script is not used to build the current package itself and that the emitted script may be generated in a context where the current package (and dependencies) do not happen to be installed.
 
-The environment produced by sourcing the result of this shim script is not used to provide environment for the shim scripts of the package itself.  It is, however, used to provide environment setup for shim scripts of any other packages that depend on this package (except for the =version= and =environment= shim scripts).
+The setup script must be written (appended) to the file named by the single command line argument given to =environment=.  It needs emphasis that the =environment= step is producing another script for later use and any environment it may directly set (as apposed to emitting) is not retained.  For =environment= steps implemented in =bash=, care must be taken to escape variables and functions in the emitted text so that they will expand in the appropriate context.  In some cases immediate expansion is desired and in others it should be delayed to occur when the resulting setup script is used.
+
+The following example illustrates a well behaved =environment= script for a fictional =mypkg= which depends on another package =mydep=:
+
+#+BEGIN_SRC sh
+#!/bin/bash
+envfile=$1 ; shift
+cat <<EOF >> $envfile
+export MYPKG_DIR=$ORCH_PACKAGE_DIR
+export MYPKG_MYDEP_DATA_DIR=\$MYDEP_DIR/data
+export PATH=\$(pathadd \$MYPKG_DIR/bin \$PATH)
+export LD_LIBRARY_PATH=\$(pathadd \$MYPKG_DIR/lib \$LD_LIBRARY_PATH)
+EOF
+#+END_SRC
+
+Some notes on this example:
+
+ - The output is appended to the resulting setup file which is specified by the script's first command line argument
+ - Not required by orchestrate, /per se/, but a =MYPKG_DIR= is defined to generically locate the package's installation area and is repeatedly used to carry through the =ORCH_PACKAGE_DIR=.  This variable may also be used by some convention defined by the users package shims in order to implement dependencies.  This example is seen in the use of the =MYDEP_DIR= variable
+ - All =ORCH_= variables must be allowed to expand as they pertain only to the current package and do not exist when the resulting setup script is used.
+ - It is assumed that the package =mydep= (see previous =dependencies= step) has a similar =environment= step which defines =MYDEP_DIR=.  The use of =MYDEP_DIR= can be escaped or expanded.  
+ - The =pathadd= function is used, but its expansion is escaped in order to delay its call.  This convenience function is guaranteed to exist when the emitted =envfile= file is ultimately used.  
 
 
 *** Download
@@ -220,6 +240,7 @@ Moving or copying the build results to their final installation location is done
 *** Validate 
 
 Any post-installation validation can be implemented in the =validate= shim script.  It is run from the =ORCH_INSTALL_DIR=.
+
 
 ** Locating a Package Shim
 
@@ -253,8 +274,17 @@ T.B.D.  A feature to be added is to specify a =shim_url= in the configuration to
 
 ** Shim Script Execution Environment
 
-The environment in which each shim executes is defined through a cascade of sources.  It begins with the environment of the user which invokes the orchestration application.  The variables defined in the suite description =defaults= section are then applied.  Then
-the results of the =environment= shim scripts for the  packages returned by recursive checking the output of the current package's =dependencies= shim script are then applied (except when calling the =version=, =environment= and =dependencies= stages themselves).  The =environment= shim is not applied to the package shim itself, rather the =package= section of the suite configuration file brings up the end of the cascade.
+A shim script executes in a well defined environment.  The details of how this environment is produced are not directly needed but may help if debugging is required.  A shim script is found as in [[Locating a Package Shim]].  It is executed in place by a "wrapper" (=bash=) script which is generated by the application and placed in the =<build_dir>/orch/= sub directory.  The wrapper is composed from the following:
+
+ - sourcing the orchestrate.sh file providing utility bash functions.  See section [[sec:bash]] for details.  
+
+ - sourcing the file produced by the =environment= step run from each package shim on which the current one depends
+
+ - sourcing a file generated by the application which setts the package-specific ORCH_* variables
+
+ - sourcing or executing of the shim script itself.
+
+Here "sourcing" means in the =bash= sense to incorporate the contents of the file into the currently running shell.  The shim "script" may in fact be any executable program.  If it is a =bash= script (as determined by it staring with the line "=#!/bin/bash=" or having a "=.sh=" file extension) then it will be sourced into the wrapper script.  Otherwise it will be executed.
 
 The following orchestration environment variable are guaranteed to be defined in the environment executing a shim script.
 

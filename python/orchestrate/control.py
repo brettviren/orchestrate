@@ -7,7 +7,7 @@ import sys
 import argparse
 import logging
 
-import commands, app, cmdline
+import commands, app
 
 from util import list_split
 
@@ -59,21 +59,6 @@ def truncate_list(lst, stop_at):
         return lst
     return lst[:lst.index(stop_at)+1]
 
-orch_utils = filter(lambda x: x.startswith('cmdline_'), dir(cmdline))
-
-def util_main(args):
-    '''This main interface provides some utilities to make writing shim
-    scripts easier.  It's called strictly like:
-
-    <prog> <command> <command args>
-
-    Where <command> is from a fixed list.
-    '''
-    cmdname = args[0]
-    cmd = cmdline.__dict__['cmd_'+cmdname]
-    ret = cmd(*args[1:])
-    print ret
-    return ret
 
 def app_main(args):
     '''
@@ -102,11 +87,7 @@ def app_main(args):
 def main(argv = None):
     if not argv:
         argv = sys.argv
-    prog = argv[1]
     args = argv[1:]
-    if len(argv) > 1:
-        if argv[1] in orch_utils:
-            return util_main(args)
     app_main(args)
 
 if '__main__' == __name__:

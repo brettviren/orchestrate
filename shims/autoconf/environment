@@ -1,8 +1,9 @@
 #!/bin/bash
 envfile=$1 ; shift
-echo "hello environment generating into $envfile"
+echo "$ORCH_PACKAGE_NAME environment generating into $envfile"
 cat <<EOF >> $envfile
-prepend PATH \$ORCH_INSTALL_DIR/bin
-prepend MANPATH \$ORCH_INSTALL_DIR/man
-prepend INFOPATH \$ORCH_INSTALL_DIR/info
+export ${ORCH_PACKAGE_NAME}_DIR=$ORCH_PACKAGE_DIR
+export PATH=\$(pathadd \$${ORCH_PACKAGE_NAME}_DIR/bin \$PATH)
+export MANPATH \$(pathadd \$${ORCH_PACKAGE_NAME}_DIR/man \$MANPATH)
+export INFOPATH \$(pathadd \$${ORCH_PACKAGE_NAME}_DIR/info \$INFOPATH)
 EOF

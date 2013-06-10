@@ -102,7 +102,7 @@ class Orchestrate(object):
             if not pname in self.packages:
                 continue
             #print '\n'.join(['%s:%s'%kv for kv in vars.items()])
-            s = shim.ShimPackage(steps=self.steps, **vars)
+            s = shim.ShimPackage(steps = self.steps, **vars)
             self.shims.append(s)
             self.package_shim[pname] = s
 

@@ -9,7 +9,7 @@ import os
 import proc
 import tempfile
 import logging
-from util import version_consistent, orch_share_directory, git_repo, cd
+from util import version_consistent, orch_share_directory, git_repo, cd, is_bash
 import download, unpack
 shell = '/bin/bash'
 
@@ -22,11 +22,12 @@ def package_shim_directories(pathlist, named, env = None):
     environment <env> and only keep the directory if a zero error code
     is returned.
     '''
-    if isinstance(named, basestring):
-        named = [named]
-
     ret = []
+    fullenv = dict(os.environ)
+    if env:
+        fullenv.update(env)
     for name in named:
+        name = name.strip()     # be nice
         for path in pathlist:
             pdir = os.path.join(path, name)
             #logging.debug('Checking shim directory %s' % pdir)
@@ -43,7 +44,12 @@ def package_shim_directories(pathlist, named, env = None):
                 continue
 
             cmdstr = '%s %s' % (shell, vshim)
-            rc = proc.run(cmdstr, env=env)
+            print 'cmdstr="%s", env=:' % cmdstr
+            for k,v in fullenv.iteritems():
+                #print '(%s)%s = (%s)%s' % (type(k),k, type(v), v)
+                assert isinstance(k,basestring)
+                assert isinstance(v,basestring)
+            rc = proc.run(cmdstr, env=fullenv)
             if rc == 0:
                 ret.append(pdir)
 
@@ -51,16 +57,6 @@ def package_shim_directories(pathlist, named, env = None):
         
     return ret
     
-def package_shim_script(name, pathlist):
-    '''
-    Return the first instance of a shim script of given <name> in <pathlist>
-    '''
-    for pdir in pathlist:
-        maybe = os.path.join(pdir, name)
-        if os.path.exists(maybe):
-            return maybe
-    return None
-
 def package_shim_dependencies(script, env):
     '''
     Return the package dependencies by running the first
@@ -92,7 +88,7 @@ def package_shim_dependencies(script, env):
         #logging.debug('%s dependency line: "%s"' % (pv, line))
         if not line: continue
         line = line.split(' ',1)
-        ret.append((line[0], line[1:]))
+        ret.append((line[0], line[1:] or ''))
     os.remove(fn)
     logging.debug('dependencies for package %s: %s from %s' % (pv, str(ret), script))
     return ret
@@ -150,19 +146,26 @@ def check_deps(shimlist):
     return
 
 
-def order_deps(shimlist):
-    '''
-    Return a new shimlist which is ordered so that no shim comes before any that it depends on.
-    '''
     
+def emit_source(funcfile, args = ""):
+    return '''if [ -f {funcfile} ] ; then
+    source {funcfile} {args}
+else
+    fail "No such file: {funcfile}"
+    exit 1
+fi
+'''.format(**locals())
+
 
 class ShimPackage(object):
     '''
-    A shim package.
+    Encapsulate a packages shims.  Stepping through them installs the package.
     '''
 
     # ordered steps
-    steps = ['download', 'unpack', 'prepare', 'build', 'install', 'postinst', 'validate']
+    steps = ['version', 'dependencies', 
+             'environment', 'download', 'unpack', 'prepare',
+             'build', 'install', 'postinst', 'validate']
 
     # map a step to where it runs from by default
     rundirs = {
@@ -174,76 +177,53 @@ class ShimPackage(object):
         'validate':      'install_dir',
     }
 
-    # required variables
+    # required keyword variables
     required = ['package_name', 'package_version', 'source_url', 'download_dir',
-                'source_dir', 'unpacked_dir', 'build_dir', 'install_dir',
-                'shim_path']
+                'source_package', 'source_dir', 'unpacked_dir', 'build_dir', 'install_dir',
+                'shim_path',    # colon-separated list of directories holding package shims
+                'shim_names',   # comma-separated list of package shim names
+                ]
 
-    def __init__(self, steps = None, **vars):
+    generated_filetypes = ['orch_setenv', 'orch_unsetenv', 'package_setenv']
 
-        if steps:
-            self.steps = steps
 
-        missing = set(self.required).difference(vars.keys())
+    def __init__(self, steps = None, **myvars):
+        '''
+        Create a ShimPackage.  This will then know the steps it is
+        configured to run, the directories in which to find shim
+        scripts and the name/version pairs of all dependencies.  
+
+        Construction should be followed up with a call to .setup()
+        once all ShimPackage objects in the suite are created.
+        '''
+
+        missing = set(self.required).difference(myvars.keys())
         if missing:
             raise ValueError, 'Shim missing variables: %s' % (', '.join(missing),)
 
-        pname = vars['package_name']
+        self.force = True
+        if steps:               # allow limiting which steps to do
+            self.steps = steps
+        self.vars = myvars
+        self.orch_env = {'ORCH_%s'%k.upper():v for k,v in self.vars.items()}
 
-        # find packages - calls the "version" shim scripts
-        self.vars = vars
-        env = {'ORCH_%s'%k.upper():v for k,v in vars.items()}
+        # Maybe calls the "version" script(s) in the orch_env.  This
+        # is done special as we use it to determine which directories
+        # hold shim scripts which can be applied to the requested version.
+        self.psd = package_shim_directories(myvars['shim_path'].split(':'),
+                                            myvars['shim_names'].split(','),
+                                            self.orch_env)
+        logging.debug('Using shim directories for %s: %s' % (self.name, ':'.join(self.psd)))
 
-        shim_names = []
-        for varname in ['shim_name','package_name','shim_fallback']:
-            n = vars.get(varname)
-            if not n: continue
-            for maybe in [x.strip() for x in n.split(',')]:
-                if maybe not in shim_names:
-                    shim_names.append(maybe)
+        # Determine the dependencies, if any, for this package in the
+        # form of package name and version.  This is also done in
+        # special, in a limited environment as we do not yet know the
+        # dependencies needed to make the full environment
+        dep_shim = self.package_shim_script('dependencies')
+        self.dep_pkgcon = package_shim_dependencies(dep_shim, self.orch_env)
 
-        shim_path = vars['shim_path']
-        psd = package_shim_directories(shim_path.split(':'), 
-                                       shim_names, env)
-        logging.debug('Using shim directories for %s: %s' % (pname, ':'.join(psd)))
-
-        # Determine the dependencies, if any, for this package
-        dep_shim = package_shim_script('dependencies', psd)
-        self.dep_ver = package_shim_dependencies(dep_shim, env)
-        self.dep_setup = []
-
-        # resolve shim script locations 
-        self.shim_scripts = {}
-        self.shim_scripts['dependencies'] = dep_shim
-        for step in self.steps:
-            self.shim_scripts[step] = package_shim_script(step, psd)
-
-        # Write this package's orchestrate variables to environment setup script
-        self.orch_env_file = self.generate_runner_filename('orchenv')
-        self.orch_unenv_file = self.generate_runner_filename('orchunenv')
-        fp = open(self.orch_env_file, 'w')
-        unfp = open(self.orch_unenv_file, 'w')
-        for kv in env.items():
-            fp.write('export %s="%s"\n' % kv)
-            unfp.write('unset %s\n' % kv[0])
-        fp.close()
-        unfp.close()
-
-        # Write this package's own environment via the shim script
-        self.pkg_env_file = self.generate_runner_filename('{package_name}env'.format(**vars))
-        fp = open(self.pkg_env_file,'w')
-        fp.write('source %s\n' % os.path.join(orch_share_directory('bash'), 'orchestrate.sh'))
-        fp.write('source %s\n' % self.orch_env_file)
-        fp.close()
-        package_shim_environment(self.pkg_env_file, psd, env)
-        fp = open(self.pkg_env_file,'a')
-        fp.write('source %s\n' % self.orch_unenv_file)
-        fp.close()
-
-        #self.runners = {s:r for s,r in zip(self.steps,map(self.make_runner, self.steps))}
-        self._runners_cache = {}
+        self.step_runners = {}
         return
-
 
     @property
     def name(self):
@@ -256,16 +236,156 @@ class ShimPackage(object):
     @property
     def depends(self):
         'Return list of names of shims on which this one depends'
-        return map(lambda x: x[0], self.dep_ver)
+        return map(lambda x: x[0], self.dep_pkgcon)
 
-    def generate_runner_filename(self, step):
+
+    def setup(self, shim_list):
         '''
-        Generate a runner file name for given step.  Runners go in build_dir/orch/.
+        Setup wrapper scripts for running shim scripts.  The list of
+        shims in <shim_list> should contain at least those shims for
+        packages that this one depends on.
         '''
+        if len(shim_list) < len(self.depends):
+            raise ValueError, 'setup of "%s" shim package not get enough shims to cover dependencies' % self.name
+
+        def get_shim(name, constraint):
+            for s in shim_list:
+                if s.name != name:
+                    continue
+                if not constraint:
+                    return s
+                if version_consistent(s.version, constraint):
+                    return s
+                else:
+                    log.warning('Package "%s/%s" inconsistent with constraint "%s"' % \
+                                    (s.name, s.version, constraint))
+                continue
+            raise ValueError, 'No shim satisfying "%s/%s" in setup' % \
+                (name, constraint or "(any)")
+
+        self.dep_shims = {n:get_shim(n,c) for n,c in self.dep_pkgcon}
+
+        # produce sequence of callable objects that run one step
+        self.step_runners = {step:self.make_runner(step) for step in self.steps}
+        self._ran = []
+        return
+
+
+    def run_noop(self):
+        return
+
+    def make_runner(self, step):
+        '''
+        Make a callable object that will run the given step.
+        '''
+        script = self.package_shim_script(step)
+
+        if not script:          # no script, maybe we have a builtin?
+            meth = self.__class__.__dict__.get('run_' + step)
+            if not meth:
+                return self.run_noop
+            def meth_curry():   # curry self
+                return meth(self)
+            return meth_curry
+
+        wrapped = self.make_wrapper(step, script)
+
+        def runner_curry():
+            cmdstr = '%s %s' % (shell, wrapped)
+            logging.info('Executing shim script via wrapper: %s' % cmdstr)
+            rc = proc.run(cmdstr)
+            if rc != 0:
+                msg = 'Failed to run %s of %s/%s' % (wrapped, self.name, self.version)
+                raise RuntimeError, msg
+        return runner_curry
+
+    def make_wrapper(self, step, script):
+        '''
+        Wrap the given <script> for the <step> in order to set up
+        calling environment.  Return the full path to the wrapper
+        script.
+        '''
+        # fixme, should not specify this here, use generated_args(step) or something
+        script_args = ''
+        if step == 'environment':
+            script_args = self.generated_filename('package_setenv')
+        
+        wrapper = self.generated_filename(step)
+        fp = open(wrapper,'w')
+        fp.write('#!/bin/bash\n')
+        #fp.write('set -x\n')
+
+        funcfile = os.path.join(orch_share_directory('bash'), 'orchestrate.sh')
+        fp.write(emit_source(funcfile))
+
+        for dep_name in self.depends:
+            dep_shim = self.dep_shims[dep_name]
+            fp.write(emit_source(dep_shim.generated_filename('package_setenv')))
+
+        orchenv = self.generated_filename('orch_setenv')
+        fp.write(emit_source(orchenv))
+        
+        rundir = self.get_rundir(step)
+        fp.write('assuredir %s\n' % rundir)
+        fp.write('goto %s\n' % rundir)
+
+        fp.write(emit_source(self.orch_setenv_file()))
+
+        script_run = 'exec'
+        if is_bash(script):
+            script_run = 'source'
+        fp.write('%s %s %s\n' % (script_run, script, script_args))
+        
+        fp.write('goback\n')
+        return wrapper
+
+
+    def package_shim_script(self, step):
+        '''
+        Return the first instance of a shim script of given <step>
+        '''
+        for pdir in self.psd:
+            # fixme: here would be where to allow shim scripts with file extensions
+            maybe = os.path.join(pdir, step) 
+            if os.path.exists(maybe):
+                return maybe
+        return None
+
+
+
+    def generated_filename(self, filetype):
+        '''
+        Return the full path to file of the given <filetype> type.
+        '''
+        allowed_types = self.generated_filetypes + self.steps
+        if not filetype in allowed_types:
+            raise ValueError, 'Unknown filetype: %s' % filetype
         odir = os.path.join(self.vars['build_dir'],'orch')
         if not os.path.exists(odir):
             os.makedirs(odir)
-        return os.path.join(odir, step)
+        return os.path.join(odir, filetype)
+
+    def _orch_xxxsetenv_file(self, which):
+        '''
+        Return and maybe generate the file that sets/unsets ORCH_* variables
+        '''
+        ftype = 'orch_' + which
+        filename = self.generated_filename(ftype)
+        if os.path.exists(filename) and not self.force:
+            return filename
+        fp = open(filename,'w')
+        for kv in self.orch_env.items():
+            if which == 'setenv':
+                fp.write('export %s="%s"\n' % kv)
+            if which == 'unsetenv':
+                fp.write('unset %s\n' % kv[0])
+        fp.close()
+        return filename
+        
+    def orch_setenv_file(self):
+        return self._orch_xxxsetenv_file('setenv')
+    def orch_unsetenv_file(self):
+        return self._orch_xxxsetenv_file('unsetenv')
 
     def get_rundir(self, step):
         '''
@@ -275,15 +395,19 @@ class ShimPackage(object):
         return self.vars[rundir]
 
     def run(self, step):
-        runner = self._runners_cache.get(step)
-        if runner:
-            return runner()
-        runner = self.make_runner(step)
-        if not runner:
-            return
-        self._runners_cache[step] = runner
-        return runner()
+        '''
+        Run a step once.
+        '''
+        if not self.step_runners:
+            raise RuntimeError, 'ShimPackage for "%s" has not been setup' % self.name
 
+        if step in self._ran:
+            raise ValueError, 'Already ran step "%s"' % step
+        
+        runner = self.step_runners[step]
+        rc = runner()
+        self._ran.append(step)
+        return rc
 
     def run_bogus(self):
         '''
@@ -336,63 +460,5 @@ class ShimPackage(object):
         if src.endswith('.zip'):
             return unpack.unzip(src, dst, creates)
         return unpack.untar(src, dst, creates)
-
-    def make_runner(self, step):
-        '''
-        Make a runner for given step.
-        '''
-        script = self.shim_scripts.get(step)
-        if not script:          # maybe a builtin?
-            meth = self.__class__.__dict__.get('run_' + step)
-            if not meth:
-                return
-            def meth_curry():
-                return meth(self)
-            return meth_curry
-
-        args = []
-        runner = self.generate_runner_filename(step)
-        rundir = self.get_rundir(step)
-        self.prepare_runner(runner, script, rundir, *args)
-        def runner_curry():
-            cmdstr = '%s %s' % (shell, runner)
-            logging.info('Executing shim script %s' % cmdstr)
-
-            rc = proc.run(cmdstr)
-            if rc != 0:
-                msg = 'Failed to run %s of %s/%s' % \
-                      (runner, self.vars['package_name'], self.vars['package_version'])
-                raise RuntimeError, msg
-        return runner_curry
-
-    def prepare_runner(self, filename, script, rundir, *args):
-        '''
-        Prepare runner script writing into file object.
-        '''
-        # fixme: make this optional dependent on a "force" value
-        #if os.path.exists(filename):
-        #    return
-        fp = open(filename,'w')
-
-        funcs = os.path.join(orch_share_directory('bash'),  'orchestrate.sh')
-
-        fp.write('#!/bin/bash\n')
-        #fp.write('set -x\n')
-        fp.write('source %s\n' % funcs)
-        for dep in self.dep_setup:
-            fp.write('source %s\n' % dep[0])
-        fp.write('source %s\n' % self.orch_env_file)
-        if rundir:
-            fp.write('assuredir %s\n' % rundir)
-            fp.write('goto %s\n' % rundir)
-        fp.write('''if head -1 {script} | grep -q /bin/bash ; then 
-    source {script} {argstr}
-else 
-    exec %s %s
-fi
-'''.format(script=script, argstr = ' '.join(args)))
-        if rundir:
-            fp.write('goback\n')
-        return
 
     pass

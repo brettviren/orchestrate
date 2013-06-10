@@ -3,9 +3,11 @@
 Test the orchestrate.proc module
 '''
 
+import os
 from orchestrate import proc
 
 import tempfile
+testdir = os.path.dirname(__file__)
 
 class Printer(object):
     def __init__(self, command):
@@ -17,7 +19,8 @@ class Printer(object):
 
 def do_run(cmd, code = 0):
     p = Printer(cmd)
-    rc = proc.run(cmd, logger=p)
+    fullenv = dict(os.environ)
+    rc = proc.run(cmd, env=fullenv, logger=p)
     assert rc == code, 'got unexpected code %d != %d' % (rc, code)
 
 
@@ -26,6 +29,7 @@ def test_simple():
             ("/bin/false", 1),
             ("/bin/true", 0),
             ("/bin/ls", 0),
+            ("/bin/bash %s" % os.path.join(testdir, 'testscript.sh'), 0),
             ]
     for cmd, code in cmds:
         do_run(cmd, code)

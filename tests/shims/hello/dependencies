@@ -2,5 +2,5 @@
 
 depfile=$1
 echo "hello dependencies got $depfile"
-echo "bc" | tee -a $depfile
+echo "bc" | tee $depfile
 

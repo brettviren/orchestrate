@@ -199,3 +199,14 @@ class cd:
 
     def __exit__(self, etype, value, traceback):
         os.chdir(self.savedPath)
+
+def is_bash(filename):
+    'Return true if <filename> is like a bash script'
+    if filename.endswith('.sh'):
+        return True
+    with open(filename) as fp:
+        first = fp.readline()
+        if first.startswith('#!/bin/bash'):
+            return True
+    return False
+    
