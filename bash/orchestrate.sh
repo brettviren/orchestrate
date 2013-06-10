@@ -41,19 +41,40 @@ assuredir () {
     mkdir -p "$@"
 }
 
-# Prepend a value to a variable.  Default delimter is ":"
-# prepend <VARIABLE> <VALUE> [<delimeter>]
-prepend () {
-    echo $@
-    fail "unimplemented"
-}    
+# Return thing in path
+# isin=$(isinpath /path/to/thing $PATH)
+isinpath () {
+    local thing=$1 ; shift
+    local other="" 
+    for other in $(echo $@ | tr : ' ')
+    do
+        if [ "$thing" = "$other" ] ; then
+            echo $thing
+            return
+        fi
+    done
+    return
+}
 
-
-# Append a value to a variable.  Default delimter is ":"
-# append <VARIABLE> <VALUE> [<delimeter>]
-append () {
-    echo $@
-    fail "unimplemented"
+# Make a new path-like value from parts
+# Any part which is not a direcotry is dropped
+# PATH=$(pathadd /path/one:/path/two $PATH /path/three)
+pathadd () {
+    local ret=""
+    local comma=""
+    local thing=""
+    for thing in $(echo $@ | tr : ' ')
+    do
+        if [ ! -d "$thing" ] ; then
+            continue
+        fi
+        if [ -n "$(isinpath $thing $ret)" ] ; then
+            continue
+        fi
+        ret="${ret}${comma}${thing}"
+        comma=":"
+    done
+    echo $ret
 }    
 
 

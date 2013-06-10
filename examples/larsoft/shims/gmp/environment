@@ -1,0 +1,9 @@
+#!/bin/bash
+envfile=$1 ; shift
+cat <<EOF >> $envfile
+export GMP_DIR=\$ORCH_INSTALL_DIR
+export PATH=\$(pathadd \$GMP_DIR/bin \$PATH)
+export MANPATH=\$(pathadd \$GMP_DIR/man \$MANPATH)
+export INFOPATH=\$(pathadd \$GMP_DIR/info \$INFOPATH)
+export LD_LIBRARY_PATH=\$(pathadd \$GMP_DIR/lib \$LD_LIBRARY_PATH)
+EOF

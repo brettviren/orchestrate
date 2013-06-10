@@ -32,7 +32,7 @@ def prepare(src, dst, creates):
         if not creates.startswith('/'):
             creates = os.path.join(dst,creates)
         if os.path.exists(creates):
-            logging.debug('idem: unzip result already exists: %s' % creates)
+            logging.debug('idem: unpack result already exists: %s' % creates)
             return False
     util.assuredir(dst)
     return True

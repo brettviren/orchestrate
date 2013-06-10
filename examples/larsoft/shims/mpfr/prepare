@@ -1,0 +1,2 @@
+#!/bin/bash
+orch_configure --with-out-java --with-gmp=${GMP_DIR}

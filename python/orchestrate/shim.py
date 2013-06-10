@@ -220,14 +220,25 @@ class ShimPackage(object):
 
         # Write this package's orchestrate variables to environment setup script
         self.orch_env_file = self.generate_runner_filename('orchenv')
+        self.orch_unenv_file = self.generate_runner_filename('orchunenv')
         fp = open(self.orch_env_file, 'w')
+        unfp = open(self.orch_unenv_file, 'w')
         for kv in env.items():
             fp.write('export %s="%s"\n' % kv)
+            unfp.write('unset %s\n' % kv[0])
         fp.close()
+        unfp.close()
 
         # Write this package's own environment via the shim script
         self.pkg_env_file = self.generate_runner_filename('{package_name}env'.format(**vars))
+        fp = open(self.pkg_env_file,'w')
+        fp.write('source %s\n' % os.path.join(orch_share_directory('bash'), 'orchestrate.sh'))
+        fp.write('source %s\n' % self.orch_env_file)
+        fp.close()
         package_shim_environment(self.pkg_env_file, psd, env)
+        fp = open(self.pkg_env_file,'a')
+        fp.write('source %s\n' % self.orch_unenv_file)
+        fp.close()
 
         #self.runners = {s:r for s,r in zip(self.steps,map(self.make_runner, self.steps))}
         self._runners_cache = {}
